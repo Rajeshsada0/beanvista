@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Theme Variables ── */
+:root {
+    --brand-50: #eff6ff;
+    --brand-100: #dbeafe;
+    --brand-200: #bfdbfe;
+    --brand-300: #93c5fd;
+    --brand-400: #60a5fa;
+    --brand-500: #3b82f6;
+    --brand-600: #2563eb;
+    --brand-700: #1d4ed8;
+    --brand-800: #1e40af;
+    --brand-900: #1e3a8a;
+    --brand-950: #172554;
+}
+
+[data-theme='red'] {
+    --brand-50: #fef2f2;
+    --brand-100: #fee2e2;
+    --brand-200: #fecaca;
+    --brand-300: #fca5a5;
+    --brand-400: #f87171;
+    --brand-500: #ef4444;
+    --brand-600: #dc2626;
+    --brand-700: #b91c1c;
+    --brand-800: #991b1b;
+    --brand-900: #7f1d1d;
+    --brand-950: #450a0a;
+}
+
+[data-theme='green'] {
+    --brand-50: #ecfdf5;
+    --brand-100: #d1fae5;
+    --brand-200: #a7f3d0;
+    --brand-300: #6ee7b7;
+    --brand-400: #34d399;
+    --brand-500: #10b981;
+    --brand-600: #059669;
+    --brand-700: #047857;
+    --brand-800: #065f46;
+    --brand-900: #064e3b;
+    --brand-950: #022c22;
+}
+
+[data-theme='blue'] {
+    --brand-50: #eff6ff;
+    --brand-100: #dbeafe;
+    --brand-200: #bfdbfe;
+    --brand-300: #93c5fd;
+    --brand-400: #60a5fa;
+    --brand-500: #3b82f6;
+    --brand-600: #2563eb;
+    --brand-700: #1d4ed8;
+    --brand-800: #1e40af;
+    --brand-900: #1e3a8a;
+    --brand-950: #172554;
+}
+
+/* ── Responsive Base Font Size ── */
+html {
+    font-size: 14px;
+}
+@media (min-width: 1280px) {
+    html {
+        font-size: 15px;
+    }
+}
+
+/* ── Global Browser Scrollbar ── */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: var(--brand-50);
+    border-radius: 99px;
+}
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--brand-400), var(--brand-600));
+    border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, var(--brand-500), var(--brand-700));
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--brand-500) var(--brand-50);
+}
+
+/* Sidebar scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--brand-400), var(--brand-600));
+    border-radius: 99px;
+}
+
+/* Hide scrollbar */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Selective Performance Transition Guidelines ── */
+/* Keep transitions selective (e.g. use transition-colors, transition-transform) */
+/* rather than transition-all to ensure high frame rates on low-end devices. */
+
+/* UX animations naturally without !important overrides */
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.animate-ping {
+    animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.animate-bounce {
+    animation: bounce 1s infinite;
+}
