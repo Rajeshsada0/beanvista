@@ -1,72 +1,70 @@
-@extends('frontend')
+<?php $__env->startSection('title', 'BeanVista POS — Complete Cafe & Restaurant Management Solution | POS, KDS & Inventory'); ?>
+<?php $__env->startSection('meta_description', 'BeanVista POS is the complete cafe & restaurant management system. Run your POS billing, kitchen display system (KDS), inventory, table reservations, and reports from one easy-to-use app.'); ?>
+<?php $__env->startSection('canonical', url('/')); ?>
+<?php $__env->startSection('og_title', 'BeanVista POS — Cafe & Restaurant Management System'); ?>
+<?php $__env->startSection('og_description', 'POS billing, table management, KDS, inventory, staff management, and analytics — designed for growing cafes and restaurants. Start your free trial.'); ?>
 
-@section('title', 'BeanVista POS — Complete Cafe & Restaurant Management Solution | POS, KDS & Inventory')
-@section('meta_description', 'BeanVista POS is the complete cafe & restaurant management system. Run your POS billing, kitchen display system (KDS), inventory, table reservations, and reports from one easy-to-use app.')
-@section('canonical', url('/'))
-@section('og_title', 'BeanVista POS — Cafe & Restaurant Management System')
-@section('og_description', 'POS billing, table management, KDS, inventory, staff management, and analytics — designed for growing cafes and restaurants. Start your free trial.')
-
-@section('schema')
+<?php $__env->startSection('schema'); ?>
 <script type="application/ld+json">
 {
-  "@@context": "https://schema.org",
-  "@@graph": [
+  "@context": "https://schema.org",
+  "@graph": [
     {
-      "@@type": "SoftwareApplication",
+      "@type": "SoftwareApplication",
       "name": "BeanVista POS",
       "applicationCategory": "BusinessApplication",
       "operatingSystem": "Web, iOS, Android, Windows",
       "description": "Complete cafe & restaurant management solution with POS billing, table reservations, kitchen display system, inventory tracking, staff management, and analytics.",
-      "url": "{{ url('/') }}",
+      "url": "<?php echo e(url('/')); ?>",
       "offers": [
-        { "@@type": "Offer", "name": "Starter",      "price": "49",  "priceCurrency": "USD" },
-        { "@@type": "Offer", "name": "Professional", "price": "129", "priceCurrency": "USD" }
+        { "@type": "Offer", "name": "Starter",      "price": "49",  "priceCurrency": "USD" },
+        { "@type": "Offer", "name": "Professional", "price": "129", "priceCurrency": "USD" }
       ],
       "aggregateRating": {
-        "@@type": "AggregateRating",
+        "@type": "AggregateRating",
         "ratingValue": "4.8",
         "reviewCount": "412",
         "bestRating": "5"
       }
     },
     {
-      "@@type": "FAQPage",
+      "@type": "FAQPage",
       "mainEntity": [
         {
-          "@@type": "Question",
+          "@type": "Question",
           "name": "What is BeanVista POS?",
-          "acceptedAnswer": { "@@type": "Answer", "text": "BeanVista POS is a complete cafe and restaurant management platform combining point-of-sale billing, table management, kitchen display system (KDS), inventory tracking, and staff management in one unified dashboard." }
+          "acceptedAnswer": { "@type": "Answer", "text": "BeanVista POS is a complete cafe and restaurant management platform combining point-of-sale billing, table management, kitchen display system (KDS), inventory tracking, and staff management in one unified dashboard." }
         },
         {
-          "@@type": "Question",
+          "@type": "Question",
           "name": "How long does setup take?",
-          "acceptedAnswer": { "@@type": "Answer", "text": "Most cafes and restaurants go live in under 60 minutes. Our onboarding imports your existing menu and we provide a dedicated setup specialist for your first shift." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Most cafes and restaurants go live in under 60 minutes. Our onboarding imports your existing menu and we provide a dedicated setup specialist for your first shift." }
         },
         {
-          "@@type": "Question",
+          "@type": "Question",
           "name": "Can I try BeanVista POS for free?",
-          "acceptedAnswer": { "@@type": "Answer", "text": "Yes. We offer a full 30-day free trial with no credit card required. You get access to all Professional plan features during your trial." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. We offer a full 30-day free trial with no credit card required. You get access to all Professional plan features during your trial." }
         },
         {
-          "@@type": "Question",
+          "@type": "Question",
           "name": "Does BeanVista POS work for multi-branch outlets?",
-          "acceptedAnswer": { "@@type": "Answer", "text": "Absolutely. Our Professional and Enterprise plans support multiple branches with a centralized dashboard for cross-location reporting, inventory, and staff management." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Absolutely. Our Professional and Enterprise plans support multiple branches with a centralized dashboard for cross-location reporting, inventory, and staff management." }
         },
         {
-          "@@type": "Question",
+          "@type": "Question",
           "name": "What payment methods does BeanVista POS support?",
-          "acceptedAnswer": { "@@type": "Answer", "text": "BeanVista POS supports tap-to-pay, QR code payments, cash, split tender, and credit/debit cards across 28 markets at a flat 0.5% rate." }
+          "acceptedAnswer": { "@type": "Answer", "text": "BeanVista POS supports tap-to-pay, QR code payments, cash, split tender, and credit/debit cards across 28 markets at a flat 0.5% rate." }
         }
       ]
     }
   ]
 }
 </script>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('head')
+<?php $__env->startSection('head'); ?>
 <style>
-@verbatim
+
 /* ── Hero ─────────────────────────────────────────── */
 .hero { padding: 5.5rem 0 4rem; overflow: hidden; }
 @media(min-width:640px){ .hero{ padding:7.5rem 0 7rem; } }
@@ -249,14 +247,14 @@
 .why-icon { font-size: 2rem; margin-bottom: 1.25rem; }
 .why-title { font-size: 1.25rem; font-weight: 800; color: var(--s900); margin-bottom: 0.5rem; }
 .why-desc { font-size: 0.9375rem; color: var(--s500); line-height: 1.6; }
-@endverbatim
-</style>
-@endsection
 
-@section('content')
+</style>
+<?php $__env->stopSection(); ?>
+
+<?php $__env->startSection('content'); ?>
 <main>
 
-{{-- ── HERO ──────────────────────────────────────── --}}
+
 <section class="hero" aria-label="Hero">
     <div class="container">
         <div class="hero-grid">
@@ -270,16 +268,16 @@
                     BeanVista POS is the complete point-of-sale and restaurant management system designed for cafés, bakeries, coffee shops, and quick-service operations.
                 </p>
                 <div class="hero-btns">
-                    <a href="{{ route('start-trial') }}" class="btn-orange">Start Free Trial</a>
-                    <a href="{{ route('book-demo') }}" class="btn-outline">Book a Demo</a>
-                    @if($settings->get('playstore_url'))
-                        <a href="{{ $settings->get('playstore_url') }}" target="_blank" rel="noopener" class="btn-outline" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.875rem 1.5rem;">
+                    <a href="<?php echo e(route('start-trial')); ?>" class="btn-orange">Start Free Trial</a>
+                    <a href="<?php echo e(route('book-demo')); ?>" class="btn-outline">Book a Demo</a>
+                    <?php if($settings->get('playstore_url')): ?>
+                        <a href="<?php echo e($settings->get('playstore_url')); ?>" target="_blank" rel="noopener" class="btn-outline" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.875rem 1.5rem;">
                             <svg viewBox="0 0 512 512" style="width: 1rem; height: 1rem; fill: var(--orange); flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M325.3 234.3L104.6 13l280.8 161.2-60.1 60.1zM47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0zm425.2 225.6l-58 33.3-60.7-60.7 60.1-60.1 58.6 33.6c24.8 14.2 24.8 59.7 0 73.9zm-225 30.4L104.6 499l280.8-161.2-60.7-60.7-60.1 59.9z"/>
                             </svg>
                             <span>Google Play</span>
                         </a>
-                    @endif
+                    <?php endif; ?>
                 </div>
                 <div class="hero-stats">
                     <div><div class="stat-val">4,000+</div><div class="stat-lbl">Outlets</div></div>
@@ -309,17 +307,17 @@
     </div>
 </section>
 
-{{-- ── FEATURES ─────────────────────────────────── --}}
+
 <section id="features" class="features-sec" aria-labelledby="feat-heading">
     <div class="container">
         <div class="reveal" style="margin-bottom:3rem; max-width:44rem;">
-            <span class="tag">{{ $settings['features_section_tag'] ?? 'Complete Restaurant Operations' }}</span>
-            <h2 class="sec-h2" id="feat-heading">{{ $settings['features_section_title'] ?? 'Streamline your counter, kitchen, and back-office.' }}</h2>
+            <span class="tag"><?php echo e($settings['features_section_tag'] ?? 'Complete Restaurant Operations'); ?></span>
+            <h2 class="sec-h2" id="feat-heading"><?php echo e($settings['features_section_title'] ?? 'Streamline your counter, kitchen, and back-office.'); ?></h2>
         </div>
 
         <div class="feat-grid">
-            @for($i = 1; $i <= 9; $i++)
-                @php
+            <?php for($i = 1; $i <= 9; $i++): ?>
+                <?php
                     $fTag   = $settings["feature_tag_$i"] ?? '';
                     $fTitle = $settings["feature_title_$i"] ?? '';
                     $fDesc  = $settings["feature_desc_$i"] ?? '';
@@ -336,27 +334,27 @@
                     } elseif ($fStyle === 'orange') {
                         $cardClass .= ' fc-orange';
                     }
-                @endphp
-                <article class="{{ $cardClass }} reveal reveal-d{{ ($i % 3) + 1 }}" id="feature-{{ $i }}">
+                ?>
+                <article class="<?php echo e($cardClass); ?> reveal reveal-d<?php echo e(($i % 3) + 1); ?>" id="feature-<?php echo e($i); ?>">
                     <div>
-                        <span class="tag" style="{{ $fStyle === 'orange' ? 'color:white; opacity:0.8;' : ($fStyle === 'dark' ? 'color:var(--orange);' : '') }}">{{ $fTag }}</span>
-                        <h3>{{ $fTitle }}</h3>
-                        <p style="{{ $fStyle === 'orange' ? 'color:rgba(255,255,255,.9);' : ($fStyle === 'dark' ? 'color:var(--s400);' : 'color:var(--s500);') }} line-height:1.6">{{ $fDesc }}</p>
+                        <span class="tag" style="<?php echo e($fStyle === 'orange' ? 'color:white; opacity:0.8;' : ($fStyle === 'dark' ? 'color:var(--orange);' : '')); ?>"><?php echo e($fTag); ?></span>
+                        <h3><?php echo e($fTitle); ?></h3>
+                        <p style="<?php echo e($fStyle === 'orange' ? 'color:rgba(255,255,255,.9);' : ($fStyle === 'dark' ? 'color:var(--s400);' : 'color:var(--s500);')); ?> line-height:1.6"><?php echo e($fDesc); ?></p>
                     </div>
-                    @if($fImg)
+                    <?php if($fImg): ?>
                         <div class="fc-img">
-                            <img src="{{ $fImg }}"
-                                 alt="{{ $fTitle }} preview" width="640" height="208" loading="lazy"
-                                 style="{{ $fStyle === 'orange' ? 'border-color:rgba(255,255,255,.15)' : ($fStyle === 'dark' ? 'border-color:rgba(255,255,255,.1)' : '') }}">
+                            <img src="<?php echo e($fImg); ?>"
+                                 alt="<?php echo e($fTitle); ?> preview" width="640" height="208" loading="lazy"
+                                 style="<?php echo e($fStyle === 'orange' ? 'border-color:rgba(255,255,255,.15)' : ($fStyle === 'dark' ? 'border-color:rgba(255,255,255,.1)' : '')); ?>">
                         </div>
-                    @endif
+                    <?php endif; ?>
                 </article>
-            @endfor
+            <?php endfor; ?>
         </div>
     </div>
 </section>
 
-{{-- ── PERFECT FOR ───────────────────────────────── --}}
+
 <section class="perfect-sec" aria-labelledby="perfect-heading">
     <div class="container">
         <div class="reveal" style="text-align:center; margin-bottom:3rem;">
@@ -364,7 +362,7 @@
             <h2 class="sec-h2" id="perfect-heading">Perfect for your venue.</h2>
         </div>
         <div class="perfect-grid reveal reveal-d1">
-            @foreach([
+            <?php $__currentLoopData = [
                 ['☕', 'Cafés'],
                 ['🥤', 'Coffee Shops'],
                 ['🍽️', 'Restaurants'],
@@ -375,19 +373,19 @@
                 ['🍹', 'Juice Bars'],
                 ['🍕', 'Pizza Shops'],
                 ['🍳', 'Cloud Kitchens']
-            ] as $p)
+            ]; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $p): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                 <div class="perfect-pill">
-                    <span class="perfect-icon">{{ $p[0] }}</span>
-                    <span class="perfect-label">{{ $p[1] }}</span>
+                    <span class="perfect-icon"><?php echo e($p[0]); ?></span>
+                    <span class="perfect-label"><?php echo e($p[1]); ?></span>
                 </div>
-            @endforeach
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
         </div>
     </div>
 </section>
 
 
 
-{{-- ── WHY CHOOSE US ───────────────────────────────── --}}
+
 <section class="why-sec" aria-labelledby="why-heading">
     <div class="container-tight">
         <div class="reveal" style="text-align:center; margin-bottom:4rem;">
@@ -395,24 +393,24 @@
             <h2 class="sec-h2" id="why-heading">Why Choose BeanVista POS?</h2>
         </div>
         <div class="why-grid">
-            @foreach([
+            <?php $__currentLoopData = [
                 ['🚀', 'Fast & Reliable', 'Built on a high-performance database cluster ensuring zero delays at the counter during peak hours.'],
                 ['🎯', 'Easy to Use', 'An intuitive interface that allows cashier onboarding in under 10 minutes with zero training required.'],
                 ['🔒', 'Secure Data Management', 'Automated cloud backups and data encryption so you never lose a transaction record.'],
                 ['✨', 'Modern Interface', 'Elegant, clutter-free layouts that enhance your counter and complement your venue\'s design.'],
                 ['📈', 'Growing Businesses', 'Centralized settings that make launching your second branch or hundredth outlet seamless.']
-            ] as $idx => $w)
-                <div class="why-card reveal reveal-d{{ ($idx % 3) + 1 }}">
-                    <div class="why-icon">{{ $w[0] }}</div>
-                    <h3 class="why-title">{{ $w[1] }}</h3>
-                    <p class="why-desc">{{ $w[2] }}</p>
+            ]; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $idx => $w): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <div class="why-card reveal reveal-d<?php echo e(($idx % 3) + 1); ?>">
+                    <div class="why-icon"><?php echo e($w[0]); ?></div>
+                    <h3 class="why-title"><?php echo e($w[1]); ?></h3>
+                    <p class="why-desc"><?php echo e($w[2]); ?></p>
                 </div>
-            @endforeach
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
         </div>
     </div>
 </section>
 
-{{-- ── PRICING ──────────────────────────────────── --}}
+
 <section id="pricing" class="pricing-sec" aria-labelledby="pricing-heading">
     <div class="container-tight">
         <div class="reveal" style="text-align:center;margin-bottom:3rem">
@@ -429,7 +427,7 @@
                 <ul class="pc-feats" aria-label="Starter plan features">
                     <li>1 POS terminal</li><li>Basic analytics</li><li>Online ordering</li><li>Email support</li>
                 </ul>
-                <a href="{{ route('start-trial') }}" class="pc-btn">Select Plan</a>
+                <a href="<?php echo e(route('start-trial')); ?>" class="pc-btn">Select Plan</a>
             </article>
 
             <article class="pc pc-feat reveal reveal-d1">
@@ -440,7 +438,7 @@
                 <ul class="pc-feats" aria-label="Professional plan features">
                     <li>5 POS terminals</li><li>Pro KDS integration</li><li>Inventory management</li><li>Customer loyalty</li><li>Priority support</li>
                 </ul>
-                <a href="{{ route('start-trial') }}" class="pc-btn pc-btn-feat">Start 30-Day Trial</a>
+                <a href="<?php echo e(route('start-trial')); ?>" class="pc-btn pc-btn-feat">Start 30-Day Trial</a>
             </article>
 
             <article class="pc reveal reveal-d2">
@@ -450,13 +448,13 @@
                 <ul class="pc-feats" aria-label="Enterprise plan features">
                     <li>Unlimited terminals</li><li>Multi-site dashboard</li><li>Dedicated manager</li><li>Custom API access</li>
                 </ul>
-                <a href="{{ route('book-demo') }}" class="pc-btn">Contact Sales</a>
+                <a href="<?php echo e(route('book-demo')); ?>" class="pc-btn">Contact Sales</a>
             </article>
         </div>
     </div>
 </section>
 
-{{-- ── FAQ ─────────────────────────────────────── --}}
+
 <section id="faq" class="faq-sec" aria-labelledby="faq-heading">
     <div class="container-slim">
         <div class="reveal" style="text-align:center;margin-bottom:3rem">
@@ -464,31 +462,32 @@
             <h2 class="sec-h2" id="faq-heading">Frequently Asked Questions</h2>
             <p style="color:var(--s500);margin-top:1rem">
                 Can&apos;t find an answer?
-                <a href="{{ route('book-demo') }}" style="color:var(--orange);font-weight:700;text-decoration:none">Talk to our team &rarr;</a>
+                <a href="<?php echo e(route('book-demo')); ?>" style="color:var(--orange);font-weight:700;text-decoration:none">Talk to our team &rarr;</a>
             </p>
         </div>
 
         <div class="faq-list reveal" role="list">
-            @foreach($faqs as $fi => $faq)
-                @php
+            <?php $__currentLoopData = $faqs; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $fi => $faq): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <?php
                     $fq = is_array($faq) ? ($faq['question'] ?? $faq[0] ?? '') : '';
                     $fa = is_array($faq) ? ($faq['answer'] ?? $faq[1] ?? '') : '';
-                @endphp
+                ?>
                 <div class="faq-item" role="listitem">
-                    <button class="faq-btn" aria-expanded="false" aria-controls="faq-a-{{ $fi }}">
-                        {{ $fq }}
+                    <button class="faq-btn" aria-expanded="false" aria-controls="faq-a-<?php echo e($fi); ?>">
+                        <?php echo e($fq); ?>
+
                         <span class="faq-icon" aria-hidden="true">
                             <svg viewBox="0 0 12 12" fill="none" stroke-width="2" stroke-linecap="round"><path d="M6 2v8M2 6h8"/></svg>
                         </span>
                     </button>
-                    <div class="faq-body" id="faq-a-{{ $fi }}" role="region">{!! $fa !!}</div>
+                    <div class="faq-body" id="faq-a-<?php echo e($fi); ?>" role="region"><?php echo $fa; ?></div>
                 </div>
-            @endforeach
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
         </div>
     </div>
 </section>
 
-{{-- ── CTA ───────────────────────────────────────── --}}
+
 <section id="customers" class="cta-sec" aria-labelledby="cta-heading">
     <div class="cta-wrap reveal">
         <div class="cta-glow1" aria-hidden="true"></div>
@@ -496,11 +495,13 @@
         <div class="cta-body">
             <span class="tag" style="color:var(--orange)">Simplify your operations</span>
             <h2 class="cta-h2" id="cta-heading">Grow a better<br>business.</h2>
-            <a href="{{ route('start-trial') }}" class="cta-btn">Join the BeanVista POS Network</a>
+            <a href="<?php echo e(route('start-trial')); ?>" class="cta-btn">Join the BeanVista POS Network</a>
             <p class="cta-note">Used by 4,000+ specialty food &amp; beverage outlets globally.</p>
         </div>
     </div>
 </section>
 
 </main>
-@endsection
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('frontend', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH D:\Laravel Project\beanvista\resources\views/frontend/home.blade.php ENDPATH**/ ?>
