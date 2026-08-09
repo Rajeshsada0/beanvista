@@ -28,35 +28,43 @@ import {
 import axios from 'axios';
 
 export default function GuestMenuView({ table, menus, rewards, banners = [], settings, tenant_slug }) {
+    // Destructure Inertia page props once at top level
+    const { currentOrder: currentOrderProp, persistedCustomer, flash } = usePage().props;
     const currency = settings?.currency_symbol || 'रू.';
+
+    // State Hooks
     const [cart, setCart] = useState([]);
     const [activeCategory, setActiveCategory] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
-
-    const categories = useMemo(() => {
-        const uniqueCats = [...new Set(menus.map(m => m.category).filter(Boolean))];
-        return ['All', ...uniqueCats];
-    }, [menus]);
-
-    // Loyalty State
-    const [customer, setCustomer] = useState(usePage().props.currentOrder?.customer || usePage().props.persistedCustomer || null);
+    const [customer, setCustomer] = useState(currentOrderProp?.customer || persistedCustomer || null);
     const [isLoyaltyModalOpen, setIsLoyaltyModalOpen] = useState(false);
     const [loyaltyData, setLoyaltyData] = useState({ phone: '', name: '' });
     const [isCheckingLoyalty, setIsCheckingLoyalty] = useState(false);
     const [loyaltyStep, setLoyaltyStep] = useState(1);
-    
-    // Notification, Order & View State
     const [notification, setNotification] = useState({ show: false, message: '', type: 'info' });
     const [activeTab, setActiveTab] = useState('menu'); // 'menu' or 'profile'
     const [selectedOrder, setSelectedOrder] = useState(null);
-
-    const currentOrderProp = usePage().props.currentOrder;
+    const [isDragging, setIsDragging] = useState(false);
+    const [startX, setStartX] = useState(0);
+    const [scrollLeft, setScrollLeft] = useState(0);
+    const [isOrdering, setIsOrdering] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
+    const [showCartReview, setShowCartReview] = useState(false);
     const [dismissedCancelledOrderId, setDismissedCancelledOrderId] = useState(() => {
         if (typeof window !== 'undefined') {
             return localStorage.getItem(`dismissed_cancelled_order_${table.id}`);
         }
         return null;
     });
+
+    // Ref Hooks
+    const scrollRef = useRef(null);
+
+    // Memoized Values
+    const categories = useMemo(() => {
+        const uniqueCats = [...new Set(menus.map(m => m.category).filter(Boolean))];
+        return ['All', ...uniqueCats];
+    }, [menus]);
 
     const activeOrder = useMemo(() => {
         if (!currentOrderProp) return null;
@@ -69,21 +77,31 @@ export default function GuestMenuView({ table, menus, rewards, banners = [], set
         return currentOrderProp;
     }, [currentOrderProp, dismissedCancelledOrderId]);
 
-    const handleStartNewOrder = (orderId) => {
-        setDismissedCancelledOrderId(orderId);
-        if (typeof window !== 'undefined') {
-            localStorage.setItem(`dismissed_cancelled_order_${table.id}`, String(orderId));
-        }
-        showNotification("Notice cleared. Select items below to place a new order.", "info");
-    };
+    const totalPointsUsed = useMemo(() => {
+        return cart.reduce((acc, item) => {
+            if (item.is_redemption) {
+                const reward = rewards.find(r => r.id === item.reward_id);
+                return acc + (reward ? reward.points_required : 0) * item.quantity;
+            }
+            return acc;
+        }, 0);
+    }, [cart, rewards]);
 
-    // Desktop Carousel Scroll Logic
-    const scrollRef = useRef(null);
-    const [isDragging, setIsDragging] = useState(false);
-    const [startX, setStartX] = useState(0);
-    const [scrollLeft, setScrollLeft] = useState(0);
+    const subtotal = useMemo(() => cart.reduce((acc, curr) => acc + (curr.price * curr.quantity), 0), [cart]);
+    const totalItems = useMemo(() => cart.reduce((acc, curr) => acc + curr.quantity, 0), [cart]);
 
-    // Sync guest order status every 5s — partial reload only for order state
+    const filteredMenus = useMemo(() => {
+        return menus.filter(item => {
+            const matchesCategory = activeCategory === 'All' || item.category === activeCategory;
+            const query = searchQuery.trim().toLowerCase();
+            const matchesSearch = !query || 
+                item.name.toLowerCase().includes(query) || 
+                (item.category && item.category.toLowerCase().includes(query));
+            return matchesCategory && matchesSearch;
+        });
+    }, [menus, activeCategory, searchQuery]);
+
+    // Effect Hooks
     useEffect(() => {
         const interval = setInterval(() => {
             if (document.visibilityState !== 'visible') return;
@@ -96,16 +114,25 @@ export default function GuestMenuView({ table, menus, rewards, banners = [], set
         return () => clearInterval(interval);
     }, []);
 
-    // Flash Message Listener
-    const { flash } = usePage().props;
     useEffect(() => {
         if (flash?.success) {
-            showNotification(flash.success, 'success');
+            setNotification({ show: true, message: flash.success, type: 'success' });
+            setTimeout(() => setNotification({ show: false, message: '', type: 'info' }), 4000);
         }
         if (flash?.error) {
-            showNotification(flash.error, 'error');
+            setNotification({ show: true, message: flash.error, type: 'error' });
+            setTimeout(() => setNotification({ show: false, message: '', type: 'info' }), 4000);
         }
     }, [flash]);
+
+    // Event Handlers & Helpers
+    const handleStartNewOrder = (orderId) => {
+        setDismissedCancelledOrderId(orderId);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(`dismissed_cancelled_order_${table.id}`, String(orderId));
+        }
+        showNotification("Notice cleared. Select items below to place a new order.", "info");
+    };
 
     const handleMouseDown = (e) => {
         if (!scrollRef.current) return;
@@ -185,35 +212,6 @@ export default function GuestMenuView({ table, menus, rewards, banners = [], set
     const removeFromCart = (menuId, isRedemption = false) => {
         setCart(prev => prev.filter(i => !(i.menu_id === menuId && i.is_redemption === isRedemption)));
     };
-
-    const totalPointsUsed = useMemo(() => {
-        return cart.reduce((acc, item) => {
-            if (item.is_redemption) {
-                const reward = rewards.find(r => r.id === item.reward_id);
-                return acc + (reward ? reward.points_required : 0) * item.quantity;
-            }
-            return acc;
-        }, 0);
-    }, [cart, rewards]);
-
-    const subtotal = useMemo(() => cart.reduce((acc, curr) => acc + (curr.price * curr.quantity), 0), [cart]);
-    const totalItems = useMemo(() => cart.reduce((acc, curr) => acc + curr.quantity, 0), [cart]);
-
-    const [isOrdering, setIsOrdering] = useState(false);
-    const [showSuccess, setShowSuccess] = useState(false);
-    const [showCartReview, setShowCartReview] = useState(false);
-
-    // Filter menu items by active category & search query
-    const filteredMenus = useMemo(() => {
-        return menus.filter(item => {
-            const matchesCategory = activeCategory === 'All' || item.category === activeCategory;
-            const query = searchQuery.trim().toLowerCase();
-            const matchesSearch = !query || 
-                item.name.toLowerCase().includes(query) || 
-                (item.category && item.category.toLowerCase().includes(query));
-            return matchesCategory && matchesSearch;
-        });
-    }, [menus, activeCategory, searchQuery]);
 
     const handleLoyaltyCheck = async (e) => {
         if (e) e.preventDefault();
@@ -836,64 +834,208 @@ export default function GuestMenuView({ table, menus, rewards, banners = [], set
                 )}
 
                 {/* Profile View Content */}
-                {activeTab === 'profile' && customer && (
+                {activeTab === 'profile' && (
                     <div className="space-y-6">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Lifetime Earned</p>
-                                <p className="text-xl sm:text-2xl font-black text-orange-600">
-                                    {parseFloat(customer.lifetime_points || 0).toFixed(0)} <span className="text-xs text-slate-500">PTS</span>
-                                </p>
-                            </div>
-                            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Visits</p>
-                                <p className="text-xl sm:text-2xl font-black text-slate-900">{customer.orders?.length || 0}</p>
-                            </div>
-                        </div>
+                        {customer ? (
+                            <>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Lifetime Earned</p>
+                                        <p className="text-xl sm:text-2xl font-black text-orange-600">
+                                            {parseFloat(customer.lifetime_points || 0).toFixed(0)} <span className="text-xs text-slate-500">PTS</span>
+                                        </p>
+                                    </div>
+                                    <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Visits</p>
+                                        <p className="text-xl sm:text-2xl font-black text-slate-900">{customer.orders?.length || 0}</p>
+                                    </div>
+                                </div>
 
-                        {/* Recent Order History */}
-                        <div className="space-y-3">
-                            <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center">
-                                <ShoppingBag className="w-4 h-4 mr-2 text-orange-500" />
-                                Order History
-                            </h3>
-                            <div className="space-y-2.5">
-                                {customer.orders && customer.orders.length > 0 ? (
-                                    customer.orders.map(order => (
-                                        <div 
-                                            key={order.id} 
-                                            onClick={() => setSelectedOrder(order)}
-                                            className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm hover:border-orange-200 transition-all cursor-pointer flex items-center justify-between group"
-                                        >
-                                            <div className="flex items-center space-x-3">
-                                                <div className="w-10 h-10 rounded-xl bg-slate-100 flex flex-col items-center justify-center text-slate-600 group-hover:bg-orange-50 group-hover:text-orange-600 transition-colors shrink-0">
-                                                    <span className="text-[9px] font-black leading-none">{new Date(order.created_at).toLocaleDateString('en-US', { month: 'short' })}</span>
-                                                    <span className="text-xs font-black mt-0.5">{new Date(order.created_at).getDate()}</span>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs font-black text-slate-900">Order #{order.id}</p>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
-                                                        {order.items?.length || 0} items • {currency} {parseFloat(order.grand_total).toFixed(2)}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center space-x-2">
-                                                <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${
-                                                    order.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
-                                                }`}>
-                                                    {order.status}
-                                                </span>
-                                                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-orange-500 transition-transform group-hover:translate-x-0.5" />
-                                            </div>
+                                {/* Available Perks & Rewards for Logged-In Customer */}
+                                {rewards && rewards.length > 0 && (
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
+                                                <Gift className="w-4 h-4 text-amber-500" />
+                                                <span>Redeemable Perks & Rewards</span>
+                                            </h3>
+                                            <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100">
+                                                {customer.loyalty_points - totalPointsUsed} PTS AVAILABLE
+                                            </span>
                                         </div>
-                                    ))
-                                ) : (
-                                    <div className="bg-white rounded-3xl p-8 text-center border border-slate-200 text-slate-400 text-xs font-semibold">
-                                        Your past order history will appear here.
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                            {rewards.map(reward => {
+                                                const canAfford = (customer.loyalty_points - totalPointsUsed >= reward.points_required);
+                                                return (
+                                                    <div 
+                                                        key={reward.id} 
+                                                        className={`bg-white rounded-3xl p-4 border shadow-sm flex items-center justify-between transition-all ${
+                                                            canAfford ? 'border-amber-200 hover:shadow-md' : 'border-slate-100 opacity-80'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center space-x-3 min-w-0 pr-2">
+                                                            {reward.image_path ? (
+                                                                <img 
+                                                                    src={`/storage/${reward.image_path}`} 
+                                                                    className="w-12 h-12 rounded-2xl object-cover border border-slate-100 shrink-0"
+                                                                    alt={reward.name}
+                                                                />
+                                                            ) : (
+                                                                <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
+                                                                    <Gift className="w-6 h-6" />
+                                                                </div>
+                                                            )}
+                                                            <div className="min-w-0">
+                                                                <h4 className="text-xs font-black text-slate-900 truncate">{reward.name}</h4>
+                                                                <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-extrabold uppercase">
+                                                                    {reward.points_required} PTS
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => addToCart(reward.menu_item, reward)}
+                                                            disabled={!canAfford}
+                                                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider shrink-0 transition-all ${
+                                                                canAfford 
+                                                                ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20 hover:bg-amber-600 active:scale-95' 
+                                                                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                            }`}
+                                                        >
+                                                            Redeem
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 )}
+
+                                {/* Recent Order History */}
+                                <div className="space-y-3">
+                                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center">
+                                        <ShoppingBag className="w-4 h-4 mr-2 text-orange-500" />
+                                        Order History
+                                    </h3>
+                                    <div className="space-y-2.5">
+                                        {customer.orders && customer.orders.length > 0 ? (
+                                            customer.orders.map(order => (
+                                                <div 
+                                                    key={order.id} 
+                                                    onClick={() => setSelectedOrder(order)}
+                                                    className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm hover:border-orange-200 transition-all cursor-pointer flex items-center justify-between group"
+                                                >
+                                                    <div className="flex items-center space-x-3">
+                                                        <div className="w-10 h-10 rounded-xl bg-slate-100 flex flex-col items-center justify-center text-slate-600 group-hover:bg-orange-50 group-hover:text-orange-600 transition-colors shrink-0">
+                                                            <span className="text-[9px] font-black leading-none">{new Date(order.created_at).toLocaleDateString('en-US', { month: 'short' })}</span>
+                                                            <span className="text-xs font-black mt-0.5">{new Date(order.created_at).getDate()}</span>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-black text-slate-900">Order #{order.id}</p>
+                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
+                                                                {order.items?.length || 0} items • {currency} {parseFloat(order.grand_total).toFixed(2)}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center space-x-2">
+                                                        <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${
+                                                            order.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+                                                        }`}>
+                                                            {order.status}
+                                                        </span>
+                                                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-orange-500 transition-transform group-hover:translate-x-0.5" />
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="bg-white rounded-3xl p-8 text-center border border-slate-200 text-slate-400 text-xs font-semibold">
+                                                Your past order history will appear here.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            /* Unauthenticated Guest State in REWARDS & PROFILE tab */
+                            <div className="space-y-6">
+                                {/* Guest Sign In Card */}
+                                <div className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden space-y-4">
+                                    <div className="relative z-10 space-y-2 max-w-md">
+                                        <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/20 text-white text-[10px] font-black uppercase tracking-widest">
+                                            <Star className="w-3 h-3 fill-amber-200 text-amber-200" />
+                                            <span>Member Benefits</span>
+                                        </div>
+                                        <h3 className="text-xl font-black tracking-tight leading-snug">Sign In to Check Loyalty Points & Rewards</h3>
+                                        <p className="text-xs text-orange-100 font-medium leading-relaxed">
+                                            You are currently browsing as a guest. Enter your phone number to check your loyalty points balance, track order history, and unlock free food rewards!
+                                        </p>
+                                    </div>
+
+                                    <button 
+                                        onClick={() => setIsLoyaltyModalOpen(true)}
+                                        className="relative z-10 px-5 py-3 bg-white text-orange-600 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg hover:bg-orange-50 active:scale-95 transition-all flex items-center space-x-2"
+                                    >
+                                        <Phone className="w-4 h-4" />
+                                        <span>Sign In / Check Points</span>
+                                    </button>
+
+                                    <div className="absolute right-[-10%] top-[-20%] w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+                                </div>
+
+                                {/* Rewards Catalog Preview */}
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
+                                            <Gift className="w-4 h-4 text-amber-500" />
+                                            <span>Available Rewards Preview</span>
+                                        </h3>
+                                    </div>
+
+                                    {rewards && rewards.length > 0 ? (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                            {rewards.map(reward => (
+                                                <div 
+                                                    key={reward.id} 
+                                                    className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center justify-between transition-all hover:border-orange-200"
+                                                >
+                                                    <div className="flex items-center space-x-3 min-w-0 pr-2">
+                                                        {reward.image_path ? (
+                                                            <img 
+                                                                src={`/storage/${reward.image_path}`} 
+                                                                className="w-12 h-12 rounded-2xl object-cover border border-slate-100 shrink-0"
+                                                                alt={reward.name}
+                                                            />
+                                                        ) : (
+                                                            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
+                                                                <Gift className="w-6 h-6" />
+                                                            </div>
+                                                        )}
+                                                        <div className="min-w-0">
+                                                            <h4 className="text-xs font-black text-slate-900 truncate">{reward.name}</h4>
+                                                            <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-extrabold uppercase">
+                                                                {reward.points_required} PTS
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => setIsLoyaltyModalOpen(true)}
+                                                        className="px-3 py-1.5 bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200 rounded-xl text-[10px] font-black uppercase tracking-wider shrink-0 transition-all"
+                                                    >
+                                                        Sign In to Redeem
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="bg-white rounded-3xl p-8 text-center border border-slate-200 space-y-2">
+                                            <Gift className="w-8 h-8 text-slate-300 mx-auto" />
+                                            <p className="text-xs font-black text-slate-800">Earn 1 Point for Every Order!</p>
+                                            <p className="text-[11px] text-slate-500 font-medium">Sign in with your phone number to earn points on every dish and unlock free offers.</p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 )}
             </main>

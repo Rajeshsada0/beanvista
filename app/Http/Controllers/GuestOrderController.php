@@ -225,7 +225,7 @@ class GuestOrderController extends Controller
                     $customer->save();
 
                     $pointsCost = $reward->points_required;
-                    ActivityLog::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)->record('redeemed', "{$customer->name} redeemed points for a free {$menu->name} (Cost: {$reward->points_required} pts)", $reward);
+                    ActivityLog::record('redeemed', "{$customer->name} redeemed points for a free {$menu->name} (Cost: {$reward->points_required} pts)", $reward);
                 } else {
                     $price = $menu->price;
                     $isRedeemed = false;
