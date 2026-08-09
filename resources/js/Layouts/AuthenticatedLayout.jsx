@@ -1,6 +1,6 @@
 import { Link, usePage, router } from '@inertiajs/react';
 import { useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, Table, CalendarDays, ShoppingBag, Coffee, ChevronRight, Menu as MenuIcon, X, Settings, User, BarChart3, ChefHat, LogIn, LogOut, Clock, Users, Gift, FolderOpen, ListPlus, Percent, ConciergeBell, Boxes, Building2, Activity, ChevronLeft, CreditCard, Monitor, Globe } from 'lucide-react';
+import { LayoutDashboard, Table, CalendarDays, ShoppingBag, Coffee, ChevronRight, ChevronDown, Menu as MenuIcon, X, Settings, User, BarChart3, ChefHat, LogIn, LogOut, Clock, Users, Gift, FolderOpen, ListPlus, Percent, ConciergeBell, Boxes, Building2, Activity, ChevronLeft, CreditCard, Monitor, Globe, Sparkles } from 'lucide-react';
 import Dropdown from '@/Components/Dropdown';
 
 export default function AuthenticatedLayout({ children }) {
@@ -14,6 +14,38 @@ export default function AuthenticatedLayout({ children }) {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
         return typeof window !== 'undefined' ? localStorage.getItem('sidebar_collapsed') === 'true' : false;
     });
+
+    const getActiveSectionId = () => {
+        const sections = user?.role === 'super_admin' ? [superAdminSection] : navSections;
+        for (const sec of sections) {
+            const hasActive = sec.items.some(item => {
+                if (user?.role === 'super_admin' && !item.superAdminOnly) return false;
+                if (user?.role !== 'super_admin' && item.superAdminOnly) return false;
+                if (item.adminOnly && user?.role !== 'admin') return false;
+                return item.active;
+            });
+            if (hasActive) return sec.id;
+        }
+        return 'daily_ops';
+    };
+
+    const [openSectionId, setOpenSectionId] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('nav_open_section');
+            if (saved !== null) return saved;
+        }
+        return 'daily_ops';
+    });
+
+    const toggleSection = (sectionId) => {
+        setOpenSectionId(prev => {
+            const next = prev === sectionId ? null : sectionId;
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('nav_open_section', next || '');
+            }
+            return next;
+        });
+    };
 
     // Enforce sidebar state persistence on mount/render to prevent auto-expand
     useEffect(() => {
@@ -45,15 +77,10 @@ export default function AuthenticatedLayout({ children }) {
     }, []);
 
     // Live sync: only poll pages that explicitly need real-time data.
-    // Pages NOT in partialMapping (reports, analytics, settings, customers, etc.)
-    // are skipped entirely — no background reload = no blinking.
     useEffect(() => {
         const isFormPage = route().current('*.create') || route().current('*.edit') || route().current('profile.*');
         if (isFormPage) return;
 
-        // Partial Reload Mapping: route name → props to refresh.
-        // Dashboard uses a slow 30s interval; operational views use 5s.
-        // Any route NOT listed here gets NO auto-refresh.
         const partialMapping = {
             'dashboard':            { keys: ['stats', 'recent_activity', 'weekly_sales'], interval: 30000 },
             'superadmin.dashboard': { keys: ['stats', 'tenants', 'recentSubscriptions'], interval: 30000 },
@@ -66,11 +93,9 @@ export default function AuthenticatedLayout({ children }) {
         const currentRoute = route().current();
         const mapping = partialMapping[currentRoute];
 
-        // This page doesn't need live polling — bail out immediately.
         if (!mapping) return;
 
         const interval = setInterval(() => {
-            // Safety guards: skip if navigating or tab is hidden
             if (isNavigating || document.visibilityState !== 'visible') return;
             router.reload({
                 preserveScroll: true,
@@ -82,76 +107,133 @@ export default function AuthenticatedLayout({ children }) {
         return () => clearInterval(interval);
     }, [route().current(), isNavigating]);
 
-    const navItems = [
-        { name: 'Dashboard', href: route('dashboard'), icon: LayoutDashboard, active: route().current('dashboard'), adminOnly: true },
-        { name: 'Table Book', href: route('table-book'), icon: Table, active: route().current('table-book'), hideSuperAdmin: true },
-        { name: 'Reservations', href: route('reservations.index'), icon: CalendarDays, active: route().current('reservations.*'), hideSuperAdmin: true },
-        { 
-            name: 'Orders', 
-            href: route('orders.index'), 
-            icon: ShoppingBag, 
-            active: route().current('orders.*') && !route().current('orders.kds') && !route().current('orders.service'), 
-            hideSuperAdmin: true
-        },
-        { name: 'POS Viewer', href: route('pos.viewer'), icon: Monitor, active: route().current('pos.viewer'), hideSuperAdmin: true },
-        { name: 'Menu Items', href: route('menus.index'), icon: Coffee, active: route().current('menus.*') || route().current('categories.*') || route().current('addons.*'), adminOnly: true, hideSuperAdmin: true },
-        { name: 'Inventory', href: route('inventory.index'), icon: Boxes, active: route().current('inventory.*'), adminOnly: true, hideSuperAdmin: true },
-        { name: 'Kitchen KDS', href: route('orders.kds'), icon: ChefHat, active: route().current('orders.kds'), hideSuperAdmin: true, badge: kds_items_count, badgeColor: 'bg-amber-500' },
-        { name: 'Service View', href: route('orders.service'), icon: ConciergeBell, active: route().current('orders.service'), hideSuperAdmin: true, badge: service_ready_count, badgeColor: 'bg-blue-500' },
-        { name: 'Loyalty', href: route('loyalty-rewards.index'), icon: Gift, active: route().current('loyalty-rewards.*'), adminOnly: true, hideSuperAdmin: true },
-        { 
-            name: 'Finance', 
-            href: route('finance.profit-loss'), 
-            icon: CreditCard, 
-            active: route().current('finance.*') || route().current('expenses.*'), 
-            adminOnly: true, 
-            hideSuperAdmin: true,
-            submenu: [
-                { name: 'Profit & Loss', href: route('finance.profit-loss'), active: route().current('finance.profit-loss') },
-                { name: 'Balance Sheet', href: route('finance.balance-sheet'), active: route().current('finance.balance-sheet') },
-                { name: 'Trial Balance', href: route('finance.trial-balance'), active: route().current('finance.trial-balance') },
-                { name: 'Cash Flow', href: route('finance.cash-flow'), active: route().current('finance.cash-flow') },
-                { name: 'General Ledger', href: route('finance.general-ledger'), active: route().current('finance.general-ledger') },
-                { name: 'Chart of Accounts', href: route('finance.accounts'), active: route().current('finance.accounts') },
-                { name: 'Journal Entries', href: route('finance.journal-entries'), active: route().current('finance.journal-entries') },
-                { name: 'Expenses', href: route('expenses.index'), active: route().current('expenses.*') },
-                { name: 'Supplier Bills', href: route('finance.supplier-bills'), active: route().current('finance.supplier-bills') },
-                { name: 'Daily Cash Counter', href: route('finance.cash-counter'), active: route().current('finance.cash-counter') },
-                { name: 'Banking', href: route('finance.banking'), active: route().current('finance.banking') },
-                { name: 'Budgets', href: route('finance.budgets'), active: route().current('finance.budgets') }
+    const navSections = [
+        {
+            id: 'daily_ops',
+            title: 'DAILY OPERATIONS',
+            badge: 'High Frequency',
+            badgeClass: 'bg-rose-50 text-rose-600 border border-rose-200/60 font-black',
+            dotClass: 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]',
+            items: [
+                { name: 'Dashboard', href: route('dashboard'), icon: LayoutDashboard, active: route().current('dashboard'), adminOnly: true },
+                { name: 'POS Viewer', href: route('pos.viewer'), icon: Monitor, active: route().current('pos.viewer'), hideSuperAdmin: true },
+                { 
+                    name: 'Orders', 
+                    href: route('orders.index'), 
+                    icon: ShoppingBag, 
+                    active: route().current('orders.*') && !route().current('orders.kds') && !route().current('orders.service'), 
+                    hideSuperAdmin: true
+                },
+                { name: 'Table Book', href: route('table-book'), icon: Table, active: route().current('table-book'), hideSuperAdmin: true },
+                { name: 'Reservations', href: route('reservations.index'), icon: CalendarDays, active: route().current('reservations.*'), hideSuperAdmin: true },
+                { name: 'Kitchen KDS', href: route('orders.kds'), icon: ChefHat, active: route().current('orders.kds'), hideSuperAdmin: true, badge: kds_items_count, badgeColor: 'bg-amber-500' },
+                { name: 'Service View', href: route('orders.service'), icon: ConciergeBell, active: route().current('orders.service'), hideSuperAdmin: true, badge: service_ready_count, badgeColor: 'bg-blue-500' },
             ]
         },
-        { 
-            name: 'Reports', 
-            href: route('reports.index'), 
-            icon: BarChart3, 
-            active: route().current('reports.*'), 
-            adminOnly: true, 
-            hideSuperAdmin: true,
-            submenu: [
-                { name: 'Financial Report', href: route('reports.index'), active: route().current('reports.index') },
-                { name: 'Advance Report', href: route('reports.analytics'), active: route().current('reports.analytics') }
+        {
+            id: 'catalog_stock',
+            title: 'CATALOG & STOCK',
+            dotClass: 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]',
+            items: [
+                { name: 'Menu Items', href: route('menus.index'), icon: Coffee, active: route().current('menus.*') || route().current('categories.*') || route().current('addons.*'), adminOnly: true, hideSuperAdmin: true },
+                { name: 'Inventory', href: route('inventory.index'), icon: Boxes, active: route().current('inventory.*'), adminOnly: true, hideSuperAdmin: true },
+                { name: 'Media Library', href: route('media.index'), icon: FolderOpen, active: route().current('media.*'), adminOnly: true, hideSuperAdmin: true },
             ]
         },
-        { name: 'Staff Performance', href: route('staff.performance'), icon: Users, active: route().current('staff.performance'), adminOnly: true, hideSuperAdmin: true },
-        { name: 'Media Library', href: route('media.index'), icon: FolderOpen, active: route().current('media.*'), adminOnly: true, hideSuperAdmin: true },
-        { name: 'Customers', href: route('customers.index'), icon: Users, active: route().current('customers.*'), hideSuperAdmin: true },
-        { name: 'Taxes', href: route('taxes.index'), icon: Percent, active: route().current('taxes.*'), adminOnly: true, hideSuperAdmin: true },
-        { name: 'My Plan', href: route('tenant.plan'), icon: Activity, active: route().current('tenant.plan'), adminOnly: true, hideSuperAdmin: true },
-        { name: 'Support Tickets', href: route('support.index'), icon: Activity, active: route().current('support.*'), adminOnly: true, hideSuperAdmin: true },
-        { name: 'Branches', href: route('branches.index'), icon: Building2, active: route().current('branches.*'), adminOnly: true, hideSuperAdmin: true },
-        { name: 'Global Settings', href: route('settings.index'), icon: Settings, active: route().current('settings.*'), adminOnly: true, hideSuperAdmin: true },
-        
-        // Super Admin Links
-        { name: 'Global Dashboard', href: route('superadmin.dashboard'), icon: LayoutDashboard, active: route().current('superadmin.dashboard'), superAdminOnly: true },
-        { name: 'Demo Bookings', href: route('superadmin.demo-bookings.index'), icon: CalendarDays, active: route().current('superadmin.demo-bookings.*'), superAdminOnly: true },
-        { name: 'Subscription Plans', href: route('superadmin.plans.index'), icon: Activity, active: route().current('superadmin.plans.*'), superAdminOnly: true },
-        { name: 'Verify Payments', href: route('superadmin.verify-payments.index'), icon: CreditCard, active: route().current('superadmin.verify-payments.*'), superAdminOnly: true },
-        { name: 'Manage Cafes', href: route('superadmin.tenants.index'), icon: Building2, active: route().current('superadmin.tenants.*'), superAdminOnly: true },
-        { name: 'Support Desk', href: route('superadmin.support.index'), icon: Activity, active: route().current('superadmin.support.*'), superAdminOnly: true },
-        { name: 'Users & App Settings', href: route('superadmin.users.index'), icon: Users, active: route().current('superadmin.users.*'), superAdminOnly: true },
-        { name: 'CMS & SEO Settings', href: route('superadmin.cms.index'), icon: Globe, active: route().current('superadmin.cms.*'), superAdminOnly: true },
+        {
+            id: 'customers_mkt',
+            title: 'CUSTOMERS & MARKETING',
+            dotClass: 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]',
+            items: [
+                { name: 'Customers', href: route('customers.index'), icon: Users, active: route().current('customers.*'), hideSuperAdmin: true },
+                { name: 'Loyalty', href: route('loyalty-rewards.index'), icon: Gift, active: route().current('loyalty-rewards.*'), adminOnly: true, hideSuperAdmin: true },
+                { name: 'Promotions & Banners', href: route('banners.index'), icon: Sparkles, active: route().current('banners.*'), adminOnly: true, hideSuperAdmin: true },
+            ]
+        },
+        {
+            id: 'business_analytics',
+            title: 'BUSINESS & ANALYTICS',
+            dotClass: 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]',
+            items: [
+                { 
+                    name: 'Finance', 
+                    href: route('finance.profit-loss'), 
+                    icon: CreditCard, 
+                    active: route().current('finance.*') || route().current('expenses.*'), 
+                    adminOnly: true, 
+                    hideSuperAdmin: true,
+                    submenu: [
+                        { name: 'Profit & Loss', href: route('finance.profit-loss'), active: route().current('finance.profit-loss') },
+                        { name: 'Balance Sheet', href: route('finance.balance-sheet'), active: route().current('finance.balance-sheet') },
+                        { name: 'Trial Balance', href: route('finance.trial-balance'), active: route().current('finance.trial-balance') },
+                        { name: 'Cash Flow', href: route('finance.cash-flow'), active: route().current('finance.cash-flow') },
+                        { name: 'General Ledger', href: route('finance.general-ledger'), active: route().current('finance.general-ledger') },
+                        { name: 'Chart of Accounts', href: route('finance.accounts'), active: route().current('finance.accounts') },
+                        { name: 'Journal Entries', href: route('finance.journal-entries'), active: route().current('finance.journal-entries') },
+                        { name: 'Expenses', href: route('expenses.index'), active: route().current('expenses.*') },
+                        { name: 'Supplier Bills', href: route('finance.supplier-bills'), active: route().current('finance.supplier-bills') },
+                        { name: 'Daily Cash Counter', href: route('finance.cash-counter'), active: route().current('finance.cash-counter') },
+                        { name: 'Banking', href: route('finance.banking'), active: route().current('finance.banking') },
+                        { name: 'Budgets', href: route('finance.budgets'), active: route().current('finance.budgets') }
+                    ]
+                },
+                { 
+                    name: 'Reports', 
+                    href: route('reports.index'), 
+                    icon: BarChart3, 
+                    active: route().current('reports.*'), 
+                    adminOnly: true, 
+                    hideSuperAdmin: true,
+                    submenu: [
+                        { name: 'Financial Report', href: route('reports.index'), active: route().current('reports.index') },
+                        { name: 'Advance Report', href: route('reports.analytics'), active: route().current('reports.analytics') }
+                    ]
+                },
+                { name: 'Staff Performance', href: route('staff.performance'), icon: Users, active: route().current('staff.performance'), adminOnly: true, hideSuperAdmin: true },
+            ]
+        },
+        {
+            id: 'settings_system',
+            title: 'SETTINGS & SYSTEM',
+            badge: 'Low Frequency',
+            badgeClass: 'bg-gray-100 text-gray-500 border border-gray-200 font-semibold',
+            dotClass: 'bg-slate-500 shadow-[0_0_8px_rgba(100,116,139,0.6)]',
+            items: [
+                { name: 'Branches', href: route('branches.index'), icon: Building2, active: route().current('branches.*'), adminOnly: true, hideSuperAdmin: true },
+                { name: 'Taxes', href: route('taxes.index'), icon: Percent, active: route().current('taxes.*'), adminOnly: true, hideSuperAdmin: true },
+                { name: 'Global Settings', href: route('settings.index'), icon: Settings, active: route().current('settings.*'), adminOnly: true, hideSuperAdmin: true },
+                { name: 'My Plan', href: route('tenant.plan'), icon: Activity, active: route().current('tenant.plan'), adminOnly: true, hideSuperAdmin: true },
+                { name: 'Support Tickets', href: route('support.index'), icon: Activity, active: route().current('support.*'), adminOnly: true, hideSuperAdmin: true },
+            ]
+        }
     ];
+
+    const superAdminSection = {
+        id: 'super_admin',
+        title: 'SUPER ADMIN OPERATIONS',
+        dotClass: 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.6)]',
+        items: [
+            { name: 'Global Dashboard', href: route('superadmin.dashboard'), icon: LayoutDashboard, active: route().current('superadmin.dashboard'), superAdminOnly: true },
+            { name: 'Demo Bookings', href: route('superadmin.demo-bookings.index'), icon: CalendarDays, active: route().current('superadmin.demo-bookings.*'), superAdminOnly: true },
+            { name: 'Subscription Plans', href: route('superadmin.plans.index'), icon: Activity, active: route().current('superadmin.plans.*'), superAdminOnly: true },
+            { name: 'Verify Payments', href: route('superadmin.verify-payments.index'), icon: CreditCard, active: route().current('superadmin.verify-payments.*'), superAdminOnly: true },
+            { name: 'Manage Cafes', href: route('superadmin.tenants.index'), icon: Building2, active: route().current('superadmin.tenants.*'), superAdminOnly: true },
+            { name: 'Support Desk', href: route('superadmin.support.index'), icon: Activity, active: route().current('superadmin.support.*'), superAdminOnly: true },
+            { name: 'Users & App Settings', href: route('superadmin.users.index'), icon: Users, active: route().current('superadmin.users.*'), superAdminOnly: true },
+            { name: 'CMS & SEO Settings', href: route('superadmin.cms.index'), icon: Globe, active: route().current('superadmin.cms.*'), superAdminOnly: true },
+        ]
+    };
+
+    // Auto-open section containing active item (and auto-close others) on route change
+    useEffect(() => {
+        const activeSecId = getActiveSectionId();
+        if (activeSecId) {
+            setOpenSectionId(activeSecId);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('nav_open_section', activeSecId);
+            }
+        }
+    }, [route().current()]);
 
     const mobileNavItems = user?.role === 'super_admin' ? [
         { name: 'Stats', href: route('superadmin.dashboard'), icon: LayoutDashboard, active: route().current('superadmin.dashboard') },
@@ -316,78 +398,124 @@ export default function AuthenticatedLayout({ children }) {
                         </div>
                     )}
 
-                    <nav className="flex-1 space-y-1 px-4 py-4 overflow-y-auto custom-scrollbar scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400">
-                        {!isSidebarCollapsed && (
-                            <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-brand-400/80 mb-3">
-                                {user.role === 'super_admin' ? 'Super Admin Menu' : 'Admin Menu'}
-                            </p>
-                        )}
-                        {navItems.filter(item => {
-                            if (user.role === 'super_admin') return item.superAdminOnly;
-                            if (item.superAdminOnly) return false;
-                            if (item.adminOnly && user.role !== 'admin') return false;
-                            return true;
-                        }).map((item) => {
-                            const Icon = item.icon;
+                    <nav className="flex-1 space-y-3 px-3 py-4 overflow-y-auto custom-scrollbar scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400">
+                        {(user?.role === 'super_admin' ? [superAdminSection] : navSections).map((section) => {
+                            const visibleItems = section.items.filter(item => {
+                                if (user?.role === 'super_admin') return item.superAdminOnly;
+                                if (item.superAdminOnly) return false;
+                                if (item.adminOnly && user?.role !== 'admin') return false;
+                                return true;
+                            });
+
+                            if (visibleItems.length === 0) return null;
+
+                            const isOpen = openSectionId === section.id;
+                            const hasActiveItem = visibleItems.some(i => i.active);
+
                             return (
-                                <div key={item.name} title={isSidebarCollapsed ? item.name : ''}>
-                                    <Link
-                                        href={item.href}
-                                        onClick={() => setIsMobileOpen(false)}
-                                        className={`group relative flex items-center rounded-xl overflow-hidden outline-none transition-all duration-200 ${
-                                            isSidebarCollapsed ? 'justify-center px-3 py-3' : 'space-x-3 px-3 py-2.5'
-                                        } ${
-                                            item.active
-                                            ? 'bg-gradient-to-br from-white/90 to-white/50 text-brand-700 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.15)] border border-white/80'
-                                            : 'text-gray-500 hover:bg-white/40 hover:text-brand-600 border border-transparent hover:shadow-sm'
-                                        }`}
-                                    >
-                                        {item.active && !isSidebarCollapsed && (
-                                            <div className="absolute left-0 top-1/2 -mt-3.5 h-7 w-[4px] rounded-r-full bg-brand-600 shadow-[2px_0_8px_rgba(79,70,229,0.5)]" />
-                                        )}
-                                        {item.active && isSidebarCollapsed && (
-                                            <div className="absolute left-0 top-1/2 -mt-4 h-8 w-[3px] rounded-r-full bg-brand-600" />
-                                        )}
-                                        <Icon className={`h-5 w-5 shrink-0 ${item.active ? 'scale-110' : ''}`} strokeWidth={item.active ? 2.5 : 2} />
-                                        {!isSidebarCollapsed && (
-                                            <>
-                                                <span className={`font-semibold tracking-wide flex-1 ${item.active ? 'text-brand-900' : ''}`}>{item.name}</span>
-                                                {item.badge > 0 && !item.submenu && (
-                                                    <span className={`px-2 py-0.5 text-[10px] font-black text-white rounded-full ${item.badgeColor || 'bg-brand-500'} ${item.active ? 'mr-6' : ''}`}>
-                                                        {item.badge}
+                                <div key={section.id} className="space-y-1">
+                                    {!isSidebarCollapsed ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleSection(section.id)}
+                                            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-all duration-150 group outline-none select-none ${
+                                                hasActiveItem ? 'bg-gray-100/70 font-bold' : 'hover:bg-gray-100/50'
+                                            }`}
+                                        >
+                                            <div className="flex items-center space-x-2 min-w-0">
+                                                <span className={`h-2 w-2 rounded-full shrink-0 transition-transform group-hover:scale-125 ${section.dotClass}`} />
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 group-hover:text-gray-900 truncate">
+                                                    {section.title}
+                                                </span>
+                                                {section.badge && (
+                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-md leading-none whitespace-nowrap hidden xl:inline-block ${section.badgeClass}`}>
+                                                        {section.badge}
                                                     </span>
                                                 )}
-                                                {item.active && !item.submenu && <ChevronRight className="absolute right-4 h-4 w-4 opacity-40 text-brand-700" strokeWidth={3} />}
-                                            </>
-                                        )}
-                                        {isSidebarCollapsed && item.badge > 0 && (
-                                            <span className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center bg-red-500 text-white text-[9px] font-black rounded-full border-2 border-white">
-                                                {item.badge > 9 ? '9+' : item.badge}
-                                            </span>
-                                        )}
-                                    </Link>
-                                    
-                                    {item.submenu && item.active && !isSidebarCollapsed && (
-                                        <div className="ml-8 mt-1 space-y-1">
-                                            {item.submenu.map(sub => (
-                                                <Link
-                                                    key={sub.name}
-                                                    href={sub.href}
-                                                    onClick={() => setIsMobileOpen(false)}
-                                                    className={`group flex items-center justify-between rounded-lg px-3 py-2 text-sm outline-none transition-colors ${
-                                                        sub.active 
-                                                        ? 'bg-brand-50 text-brand-700 font-bold' 
-                                                        : 'text-gray-500 hover:bg-white/50 hover:text-brand-600 font-medium'
+                                            </div>
+                                            <div className="flex items-center shrink-0 ml-1">
+                                                <ChevronDown
+                                                    className={`h-3.5 w-3.5 text-gray-400 group-hover:text-gray-700 transition-transform duration-200 ${
+                                                        !isOpen ? '-rotate-90' : 'rotate-0'
                                                     }`}
-                                                >
-                                                    <span>{sub.name}</span>
-                                                    {sub.badge > 0 && (
-                                                        <span className={`px-2 py-0.5 text-[10px] font-black text-white rounded-full ${sub.badgeColor || 'bg-brand-500'}`}>
-                                                            {sub.badge}
-                                                        </span>
-                                                    )}
-                                                </Link>
-                                            ))}
+                                                />
+                                            </div>
+                                        </button>
+                                    ) : (
+                                        <div className="relative py-2 flex items-center justify-center group" title={section.title}>
+                                            <div className="w-full border-t border-gray-100 absolute" />
+                                            <span className={`relative z-10 h-2 w-2 rounded-full ${section.dotClass}`} />
+                                        </div>
+                                    )}
+
+                                    {(isOpen || isSidebarCollapsed) && (
+                                        <div className="space-y-1">
+                                            {visibleItems.map((item) => {
+                                                const Icon = item.icon;
+                                                return (
+                                                    <div key={item.name} title={isSidebarCollapsed ? item.name : ''}>
+                                                        <Link
+                                                            href={item.href}
+                                                            onClick={() => setIsMobileOpen(false)}
+                                                            className={`group relative flex items-center rounded-xl overflow-hidden outline-none transition-all duration-200 ${
+                                                                isSidebarCollapsed ? 'justify-center px-3 py-3' : 'space-x-3 px-3 py-2.5'
+                                                            } ${
+                                                                item.active
+                                                                ? 'bg-gradient-to-br from-white/90 to-white/50 text-brand-700 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.15)] border border-white/80'
+                                                                : 'text-gray-500 hover:bg-white/40 hover:text-brand-600 border border-transparent hover:shadow-sm'
+                                                            }`}
+                                                        >
+                                                            {item.active && !isSidebarCollapsed && (
+                                                                <div className="absolute left-0 top-1/2 -mt-3.5 h-7 w-[4px] rounded-r-full bg-brand-600 shadow-[2px_0_8px_rgba(79,70,229,0.5)]" />
+                                                            )}
+                                                            {item.active && isSidebarCollapsed && (
+                                                                <div className="absolute left-0 top-1/2 -mt-4 h-8 w-[3px] rounded-r-full bg-brand-600" />
+                                                            )}
+                                                            <Icon className={`h-5 w-5 shrink-0 ${item.active ? 'scale-110' : ''}`} strokeWidth={item.active ? 2.5 : 2} />
+                                                            {!isSidebarCollapsed && (
+                                                                <>
+                                                                    <span className={`font-semibold tracking-wide flex-1 text-xs sm:text-sm ${item.active ? 'text-brand-900 font-bold' : ''}`}>{item.name}</span>
+                                                                    {item.badge > 0 && !item.submenu && (
+                                                                        <span className={`px-2 py-0.5 text-[10px] font-black text-white rounded-full ${item.badgeColor || 'bg-brand-500'} ${item.active ? 'mr-6' : ''}`}>
+                                                                            {item.badge}
+                                                                        </span>
+                                                                    )}
+                                                                    {item.active && !item.submenu && <ChevronRight className="absolute right-4 h-4 w-4 opacity-40 text-brand-700" strokeWidth={3} />}
+                                                                </>
+                                                            )}
+                                                            {isSidebarCollapsed && item.badge > 0 && (
+                                                                <span className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center bg-red-500 text-white text-[9px] font-black rounded-full border-2 border-white">
+                                                                    {item.badge > 9 ? '9+' : item.badge}
+                                                                </span>
+                                                            )}
+                                                        </Link>
+                                                        
+                                                        {item.submenu && item.active && !isSidebarCollapsed && (
+                                                            <div className="ml-8 mt-1 space-y-1">
+                                                                {item.submenu.map(sub => (
+                                                                    <Link
+                                                                        key={sub.name}
+                                                                        href={sub.href}
+                                                                        onClick={() => setIsMobileOpen(false)}
+                                                                        className={`group flex items-center justify-between rounded-lg px-3 py-2 text-xs outline-none transition-colors ${
+                                                                            sub.active 
+                                                                            ? 'bg-brand-50 text-brand-700 font-bold' 
+                                                                            : 'text-gray-500 hover:bg-white/50 hover:text-brand-600 font-medium'
+                                                                        }`}
+                                                                    >
+                                                                        <span>{sub.name}</span>
+                                                                        {sub.badge > 0 && (
+                                                                            <span className={`px-2 py-0.5 text-[10px] font-black text-white rounded-full ${sub.badgeColor || 'bg-brand-500'}`}>
+                                                                                {sub.badge}
+                                                                            </span>
+                                                                        )}
+                                                                    </Link>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>

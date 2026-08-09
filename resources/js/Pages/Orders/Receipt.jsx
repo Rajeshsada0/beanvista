@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { Printer, ArrowLeft, Coffee, CheckCircle2, Calendar, Hash, Table as TableIcon, CreditCard, Banknote, Wallet, QrCode } from 'lucide-react';
+import { Printer, ArrowLeft, Coffee, CheckCircle2, XCircle, Clock, Calendar, Hash, Table as TableIcon, CreditCard, Banknote, Wallet, QrCode } from 'lucide-react';
 
 export default function Receipt({ order, taxes }) {
     const { settings } = usePage().props;
@@ -203,10 +203,22 @@ export default function Receipt({ order, taxes }) {
                                 </div>
                                 <div className="text-right">
                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Status</p>
-                                    <div className="inline-flex items-center px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase tracking-widest ring-1 ring-emerald-100">
-                                        <CheckCircle2 className="w-3 h-3 mr-1" />
-                                        PAID
-                                    </div>
+                                    {order.status === 'completed' ? (
+                                        <div className="inline-flex items-center px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase tracking-widest ring-1 ring-emerald-100">
+                                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                                            PAID
+                                        </div>
+                                    ) : order.status === 'cancelled' ? (
+                                        <div className="inline-flex items-center px-2 py-1 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase tracking-widest ring-1 ring-rose-100">
+                                            <XCircle className="w-3 h-3 mr-1" />
+                                            CANCELLED
+                                        </div>
+                                    ) : (
+                                        <div className="inline-flex items-center px-2 py-1 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-black uppercase tracking-widest ring-1 ring-amber-100">
+                                            <Clock className="w-3 h-3 mr-1" />
+                                            UNPAID
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -226,20 +238,26 @@ export default function Receipt({ order, taxes }) {
                                         <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Cash</p>
                                         <div className="flex items-center justify-end gap-1">
                                             <span className="text-xs sm:text-sm font-black text-gray-900">{currency}</span>
-                                            <span className="text-xs sm:text-sm font-black text-gray-900">{parseFloat(order.cash_amount).toFixed(2)}</span>
+                                            <span className="text-xs sm:text-sm font-black text-gray-900">{parseFloat(order.cash_amount || 0).toFixed(2)}</span>
                                         </div>
                                     </div>
                                     <div className="bg-white p-3 rounded-xl border border-gray-100">
                                         <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Online</p>
                                         <div className="flex items-center justify-end gap-1">
                                             <span className="text-xs sm:text-sm font-black text-gray-900">{currency}</span>
-                                            <span className="text-xs sm:text-sm font-black text-gray-900">{parseFloat(order.online_amount).toFixed(2)}</span>
+                                            <span className="text-xs sm:text-sm font-black text-gray-900">{parseFloat(order.online_amount || 0).toFixed(2)}</span>
                                         </div>
                                     </div>
                                 </div>
                             ) : (
                                 <p className="text-xs font-bold text-gray-600">
-                                    Full payment processed via {order.payment_method === 'cash' ? 'Cash' : 'Online / Card'}.
+                                    {order.status === 'completed' ? (
+                                        `Full payment processed via ${order.payment_method === 'cash' ? 'Cash' : 'Online / Card'}.`
+                                    ) : order.status === 'cancelled' ? (
+                                        `This order was cancelled.`
+                                    ) : (
+                                        `Payment Pending (Payable via ${order.payment_method === 'cash' ? 'Cash' : 'Online / Card'}).`
+                                    )}
                                 </p>
                             )}
                         </div>

@@ -259,7 +259,7 @@
     <div class="container">
         <div class="hero-grid">
             <div style="animation:fadeInUp .8s ease both">
-                <span class="hero-badge">BeanVista POS &mdash; Retail POS Solutions Nepal</span>
+                <span class="hero-badge">BeanVista POS &mdash; Retail POS Solution</span>
                 <h1 class="hero-h1">
                     Manage Your<br>
                     <em>Entire</em> Cafe &amp; Shop.

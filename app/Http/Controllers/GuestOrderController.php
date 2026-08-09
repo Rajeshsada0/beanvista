@@ -41,9 +41,20 @@ class GuestOrderController extends Controller
         $currentOrder = Order::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
             ->where('tenant_id', $tenant->id)
             ->where('table_id', $table->id)
-            ->where('status', '!=', 'completed')
+            ->whereNotIn('status', ['completed', 'cancelled'])
             ->with('items.menu', 'customer')
+            ->latest()
             ->first();
+
+        if (!$currentOrder) {
+            $currentOrder = Order::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+                ->where('tenant_id', $tenant->id)
+                ->where('table_id', $table->id)
+                ->where('status', 'cancelled')
+                ->with('items.menu', 'customer')
+                ->latest()
+                ->first();
+        }
 
         // PERSISTENCE & CLEANUP:
         $persistedCustomer = null;
@@ -84,10 +95,17 @@ class GuestOrderController extends Controller
             }
         }
 
+        $banners = \App\Models\Banner::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+            ->where('tenant_id', $tenant->id)
+            ->where('status', true)
+            ->orderBy('sort_order')
+            ->get();
+
         return Inertia::render('Menu/GuestMenuView', [
             'table' => $table,
             'menus' => $menus,
             'rewards' => $rewards,
+            'banners' => $banners,
             'currentOrder' => $currentOrder,
             'persistedCustomer' => $persistedCustomer,
         ]);
@@ -169,11 +187,11 @@ class GuestOrderController extends Controller
             ->where('tenant_id', $tenant->id)
             ->findOrFail($tableId);
 
-        // Check if there's already an active order for this table
+        // Check if there's already an active order for this table (excluding completed & cancelled)
         $order = Order::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
             ->where('tenant_id', $tenant->id)
             ->where('table_id', $tableId)
-            ->where('status', '!=', 'completed')
+            ->whereNotIn('status', ['completed', 'cancelled'])
             ->first();
 
         if (!$order) {

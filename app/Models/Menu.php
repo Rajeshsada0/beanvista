@@ -11,7 +11,7 @@ class Menu extends Model
     use BelongsToTenant, \App\Traits\BelongsToBranch;
 
     protected $fillable = [
-        'branch_id', 'name', 'category', 'category_id', 'price', 'original_price', 'cost_price', 'status', 'send_to_kitchen', 'image_path', 'icon_path'];
+        'branch_id', 'name', 'description', 'category', 'category_id', 'price', 'original_price', 'cost_price', 'status', 'send_to_kitchen', 'image_path', 'icon_path'];
 
     public function category_group()
     {

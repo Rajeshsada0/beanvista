@@ -118,6 +118,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('support/{ticket}/status', [\App\Http\Controllers\SupportTicketController::class, 'updateStatus'])->name('support.status');
         
         Route::resource('loyalty-rewards', \App\Http\Controllers\LoyaltyRewardController::class)->except(['create', 'edit']);
+        Route::resource('banners', \App\Http\Controllers\BannerController::class)->except(['create', 'edit']);
+        Route::post('banners/{banner}/toggle-status', [\App\Http\Controllers\BannerController::class, 'toggleStatus'])->name('banners.toggle-status');
         
         // Expenses
         Route::get('/expenses', [\App\Http\Controllers\ExpenseController::class, 'index'])->name('expenses.index');

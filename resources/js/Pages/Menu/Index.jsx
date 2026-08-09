@@ -47,6 +47,7 @@ export default function MenuIndex({ menus, db_categories = [] }) {
 
     const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm({
         name: '',
+        description: '',
         category_id: db_categories.length > 0 ? db_categories[0].id : '',
         original_price: '',
         price: '',
@@ -78,6 +79,7 @@ export default function MenuIndex({ menus, db_categories = [] }) {
         const categoryName = db_categories.find(c => c.id === categoryId)?.name || menu.category || '';
         setData({
             name: menu.name,
+            description: menu.description || '',
             category_id: categoryId,
             original_price: menu.original_price || '',
             price: menu.price,
@@ -639,6 +641,17 @@ export default function MenuIndex({ menus, db_categories = [] }) {
                                                 Please create a category first.
                                             </p>
                                         )}
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1.5">Description</label>
+                                        <textarea 
+                                            rows="3"
+                                            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-sm"
+                                            placeholder="Ingredients, flavor notes, or preparation style..."
+                                            value={data.description}
+                                            onChange={e => setData('description', e.target.value)}
+                                        />
                                     </div>
                                 </div>
 

@@ -33,6 +33,7 @@ class MenuController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string',
+            'description' => 'nullable|string',
             'category_id' => 'required|exists:categories,id',
             'original_price' => 'nullable|numeric|min:0',
             'price' => 'required|numeric|min:0',
@@ -73,6 +74,7 @@ class MenuController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string',
+            'description' => 'nullable|string',
             'category_id' => 'required|exists:categories,id',
             'original_price' => 'nullable|numeric|min:0',
             'price' => 'required|numeric|min:0',

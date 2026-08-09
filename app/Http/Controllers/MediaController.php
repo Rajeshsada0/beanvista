@@ -21,7 +21,11 @@ class MediaController extends Controller
     public function index(Request $request)
     {
         $type = $request->input('type', 'images'); // 'images' or 'icons'
-        $tenantId = auth()->user()->tenant_id;
+        $user = auth()->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+        $tenantId = $user->tenant_id;
         $directory = "tenants/{$tenantId}/menus/{$type}";
         
         if (!Storage::disk('public')->exists($directory)) {
@@ -62,7 +66,11 @@ class MediaController extends Controller
         }
 
         $type = $request->input('type', 'images');
-        $tenantId = auth()->user()->tenant_id;
+        $user = auth()->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+        $tenantId = $user->tenant_id;
         $directory = "tenants/{$tenantId}/menus/{$type}";
 
         if (!Storage::disk('public')->exists($directory)) {
