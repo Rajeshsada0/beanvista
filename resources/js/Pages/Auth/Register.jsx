@@ -33,7 +33,7 @@ export default function Register() {
 
             <div className="bg-white bg-opacity-95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white border-opacity-20">
                 <div className="text-center mb-8">
-                    <ApplicationLogo className="h-16 w-16 mx-auto mb-4 text-gray-700" />
+                    <ApplicationLogo className="h-16 w-auto max-w-[240px] object-contain mx-auto mb-4 text-gray-700" />
                     <h2 className="text-2xl font-bold text-gray-900">Create Account</h2>
                     <p className="mt-2 text-sm text-gray-600">Join us and start your journey</p>
                 </div>

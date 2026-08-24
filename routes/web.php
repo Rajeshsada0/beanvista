@@ -167,6 +167,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/inventory/usages', [\App\Http\Controllers\InventoryController::class, 'storeUsage'])->name('inventory.usages.store');
         Route::put('/inventory/usages/{usage}', [\App\Http\Controllers\InventoryController::class, 'updateUsage'])->name('inventory.usages.update');
         Route::delete('/inventory/usages/{usage}', [\App\Http\Controllers\InventoryController::class, 'destroyUsage'])->name('inventory.usages.destroy');
+        // Wastes
+        Route::post('/inventory/wastes', [\App\Http\Controllers\InventoryController::class, 'storeWaste'])->name('inventory.wastes.store');
+        Route::put('/inventory/wastes/{waste}', [\App\Http\Controllers\InventoryController::class, 'updateWaste'])->name('inventory.wastes.update');
+        Route::delete('/inventory/wastes/{waste}', [\App\Http\Controllers\InventoryController::class, 'destroyWaste'])->name('inventory.wastes.destroy');
         // Configuration
         Route::post('/inventory/suppliers', [\App\Http\Controllers\InventoryController::class, 'storeSupplier'])->name('inventory.suppliers.store');
         Route::put('/inventory/suppliers/{supplier}', [\App\Http\Controllers\InventoryController::class, 'updateSupplier'])->name('inventory.suppliers.update');

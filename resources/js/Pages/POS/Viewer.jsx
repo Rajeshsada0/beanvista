@@ -5,7 +5,8 @@ import {
     Trash2, Plus, Minus, UserCircle, UserPlus, 
     ClipboardList, CheckCircle, Ban, Clock, Store, 
     Utensils, Car, Truck, CalendarClock, PartyPopper,
-    X, Eye, Edit3, Filter, Printer, Wallet, QrCode, Building2, LogOut, ShoppingCart, CheckSquare
+    X, Eye, Edit3, Filter, Printer, Wallet, QrCode, Building2, LogOut, ShoppingCart, CheckSquare,
+    ArrowLeft
 } from 'lucide-react';
 import CategoryFilter from '@/Components/POS/CategoryFilter';
 import ProductGrid from '@/Components/POS/ProductGrid';
@@ -354,15 +355,14 @@ export default function Viewer({ menus = [], categories = [], tables = [], addon
             <div className="h-14 border-b border-gray-100 flex items-center justify-between px-4 bg-white flex-shrink-0">
                 <div className="flex items-center gap-4">
                     <button onClick={() => setShowSidebar(true)} className="p-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"><MenuIcon size={18} /></button>
-                    <Link href={route('dashboard')} className="flex items-center gap-2 hover:opacity-90 transition-opacity">
-                        <div className={`flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden ${!settings?.site_logo ? 'bg-gradient-to-tr from-brand-600 via-purple-600 to-pink-500' : 'bg-white border border-gray-200'}`}>
-                            <ApplicationLogo className="w-full h-full object-cover" />
-                        </div>
-                        <div className="text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-600 py-1.5 px-3 font-semibold flex items-center justify-center">
-                            {siteName}
-                        </div>
-                    </Link>
-                    <button onClick={() => router.get(route('dashboard'))} className="p-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 ml-2"><Monitor size={18} /></button>
+                    <button 
+                        onClick={() => router.get(route('dashboard'))} 
+                        className="p-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 ml-2 flex items-center gap-1.5"
+                        title="Back to Dashboard"
+                    >
+                        <ArrowLeft size={18} />
+                        <span className="text-xs font-bold hidden md:inline">Back</span>
+                    </button>
                 </div>
                 <div className="flex items-center gap-3">
                     <button onClick={toggleFullScreen} className="hidden sm:inline-flex p-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">

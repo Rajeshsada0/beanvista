@@ -1,4 +1,4 @@
-@php
+<?php
     $globalSettings = cache()->remember('global_cms_settings', 60, function () {
         return \App\Models\Setting::withoutGlobalScopes()
             ->whereNull('tenant_id')
@@ -17,52 +17,52 @@
     $contactPhone = $globalSettings->get('contact_phone', '+1-555-0199');
     $contactWhatsApp = $globalSettings->get('contact_whatsapp', '');
     $playstoreUrl = $globalSettings->get('playstore_url', '');
-@endphp
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    {{-- SEO Core --}}
-    <title>@yield('title', $seoTitle)</title>
-    <meta name="description" content="@yield('meta_description', $seoDesc)">
-    <meta name="keywords" content="@yield('meta_keywords', $seoKeywords)">
+    
+    <title><?php echo $__env->yieldContent('title', $seoTitle); ?></title>
+    <meta name="description" content="<?php echo $__env->yieldContent('meta_description', $seoDesc); ?>">
+    <meta name="keywords" content="<?php echo $__env->yieldContent('meta_keywords', $seoKeywords); ?>">
     <meta name="robots" content="index, follow">
-    <link rel="canonical" href="@yield('canonical', url()->current())">
+    <link rel="canonical" href="<?php echo $__env->yieldContent('canonical', url()->current()); ?>">
 
-    {{-- Open Graph --}}
+    
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="BeanVista POS">
-    <meta property="og:title" content="@yield('og_title', $seoTitle)">
-    <meta property="og:description" content="@yield('og_description', $seoDesc)">
-    <meta property="og:url" content="@yield('canonical', url()->current())">
-    <meta property="og:image" content="@yield('og_image', $siteLogo ?? asset('images/og-home.png'))">
+    <meta property="og:title" content="<?php echo $__env->yieldContent('og_title', $seoTitle); ?>">
+    <meta property="og:description" content="<?php echo $__env->yieldContent('og_description', $seoDesc); ?>">
+    <meta property="og:url" content="<?php echo $__env->yieldContent('canonical', url()->current()); ?>">
+    <meta property="og:image" content="<?php echo $__env->yieldContent('og_image', $siteLogo ?? asset('images/og-home.png')); ?>">
 
-    {{-- Twitter Card --}}
+    
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="@yield('og_title', $seoTitle)">
-    <meta name="twitter:description" content="@yield('og_description', $seoDesc)">
-    <meta name="twitter:image" content="@yield('og_image', $siteLogo ?? asset('images/og-home.png'))">
+    <meta name="twitter:title" content="<?php echo $__env->yieldContent('og_title', $seoTitle); ?>">
+    <meta name="twitter:description" content="<?php echo $__env->yieldContent('og_description', $seoDesc); ?>">
+    <meta name="twitter:image" content="<?php echo $__env->yieldContent('og_image', $siteLogo ?? asset('images/og-home.png')); ?>">
 
-    {{-- Favicon --}}
-    @if($siteFavicon)
-        <link rel="icon" type="image/x-icon" href="{{ $siteFavicon }}">
-    @endif
+    
+    <?php if($siteFavicon): ?>
+        <link rel="icon" type="image/x-icon" href="<?php echo e($siteFavicon); ?>">
+    <?php endif; ?>
 
-    {{-- Google Fonts --}}
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,800&display=swap" rel="stylesheet">
 
-    {{-- Schema.org JSON-LD per-page --}}
-    @yield('schema')
+    
+    <?php echo $__env->yieldContent('schema'); ?>
 
-    {{-- Per-page extra head tags --}}
-    @yield('head')
+    
+    <?php echo $__env->yieldContent('head'); ?>
 
     <style>
-@verbatim
+
         /* ======================================================
            CREMA.OS — Public Pages Design System
            ====================================================== */
@@ -377,40 +377,40 @@
         .faq-item.open .faq-icon svg { stroke:white; }
         .faq-body { display:none; padding:0 1.5rem 1.25rem; color:var(--s500); line-height:1.75; font-size:.9375rem; }
         .faq-item.open .faq-body { display:block; }
-@endverbatim
+
     </style>
 </head>
 <body>
 
 <nav class="crema-nav" id="mainNav" aria-label="Main navigation">
     <div class="nav-inner">
-        <a href="{{ route('home') }}" class="nav-logo" aria-label="BeanVista POS Home">
-            @if($siteLogo)
-                <img src="{{ $siteLogo }}" alt="BeanVista POS Logo" style="height:2rem; width:auto; object-fit:contain;" />
-            @else
+        <a href="<?php echo e(route('home')); ?>" class="nav-logo" aria-label="BeanVista POS Home">
+            <?php if($siteLogo): ?>
+                <img src="<?php echo e($siteLogo); ?>" alt="BeanVista POS Logo" style="height:2rem; width:auto; object-fit:contain;" />
+            <?php else: ?>
                 <div class="logo-icon">
                     <div class="logo-ping"></div>
                     <div class="logo-dot"></div>
                 </div>
                 <span class="logo-text">BeanVista POS</span>
-            @endif
+            <?php endif; ?>
         </a>
         <nav class="nav-links" aria-label="Site sections">
-            <a href="{{ route('home') }}#features">Features</a>
-            <a href="{{ route('home') }}#pricing">Pricing</a>
-            <a href="{{ route('home') }}#faq">FAQ</a>
-            <a href="{{ route('docs') }}">Docs</a>
-            <a href="{{ route('about') }}">About</a>
-            <a href="{{ route('reviews') }}">Reviews</a>
-            <a href="{{ route('contact') }}">Contact</a>
+            <a href="<?php echo e(route('home')); ?>#features">Features</a>
+            <a href="<?php echo e(route('home')); ?>#pricing">Pricing</a>
+            <a href="<?php echo e(route('home')); ?>#faq">FAQ</a>
+            <a href="<?php echo e(route('docs')); ?>">Docs</a>
+            <a href="<?php echo e(route('about')); ?>">About</a>
+            <a href="<?php echo e(route('reviews')); ?>">Reviews</a>
+            <a href="<?php echo e(route('contact')); ?>">Contact</a>
         </nav>
         <div class="nav-actions">
-            @auth
-                <a href="{{ route('dashboard') }}" class="btn-nav-login">Dashboard &rarr;</a>
-            @else
-                <a href="{{ route('login') }}" class="btn-nav-login">Log in</a>
-                <a href="{{ route('book-demo') }}" class="btn-nav-cta">Book Demo</a>
-            @endauth
+            <?php if(auth()->guard()->check()): ?>
+                <a href="<?php echo e(route('dashboard')); ?>" class="btn-nav-login">Dashboard &rarr;</a>
+            <?php else: ?>
+                <a href="<?php echo e(route('login')); ?>" class="btn-nav-login">Log in</a>
+                <a href="<?php echo e(route('book-demo')); ?>" class="btn-nav-cta">Book Demo</a>
+            <?php endif; ?>
             
             <button class="nav-mobile-toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false">
                 <span class="bar"></span>
@@ -424,16 +424,16 @@
 <div class="nav-overlay" id="navOverlay" aria-hidden="true"></div>
 <div class="nav-mobile-menu" id="mobileMenu" aria-label="Mobile navigation menu" role="dialog" aria-modal="true">
     <div class="mobile-menu-header">
-        <a href="{{ route('home') }}" class="nav-logo" aria-label="BeanVista POS Home">
-            @if($siteLogo)
-                <img src="{{ $siteLogo }}" alt="BeanVista POS Logo" style="height:1.75rem; width:auto; object-fit:contain;" />
-            @else
+        <a href="<?php echo e(route('home')); ?>" class="nav-logo" aria-label="BeanVista POS Home">
+            <?php if($siteLogo): ?>
+                <img src="<?php echo e($siteLogo); ?>" alt="BeanVista POS Logo" style="height:1.75rem; width:auto; object-fit:contain;" />
+            <?php else: ?>
                 <div class="logo-icon" style="width:1.75rem; height:1.75rem;">
                     <div class="logo-ping"></div>
                     <div class="logo-dot"></div>
                 </div>
                 <span class="logo-text" style="font-size:1rem;">BeanVista POS</span>
-            @endif
+            <?php endif; ?>
         </a>
         <button class="mobile-menu-close" id="navClose" aria-label="Close navigation menu">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -444,63 +444,63 @@
     </div>
     <div class="mobile-menu-body">
         <nav class="mobile-menu-nav" aria-label="Mobile navigation links">
-            <a href="{{ route('home') }}#features">Features</a>
-            <a href="{{ route('home') }}#pricing">Pricing</a>
-            <a href="{{ route('home') }}#faq">FAQ</a>
-            <a href="{{ route('docs') }}">Docs</a>
-            <a href="{{ route('about') }}">About</a>
-            <a href="{{ route('reviews') }}">Reviews</a>
-            <a href="{{ route('contact') }}">Contact</a>
+            <a href="<?php echo e(route('home')); ?>#features">Features</a>
+            <a href="<?php echo e(route('home')); ?>#pricing">Pricing</a>
+            <a href="<?php echo e(route('home')); ?>#faq">FAQ</a>
+            <a href="<?php echo e(route('docs')); ?>">Docs</a>
+            <a href="<?php echo e(route('about')); ?>">About</a>
+            <a href="<?php echo e(route('reviews')); ?>">Reviews</a>
+            <a href="<?php echo e(route('contact')); ?>">Contact</a>
         </nav>
         <div class="mobile-menu-actions">
-            @auth
-                <a href="{{ route('dashboard') }}" class="btn-orange" style="text-align:center;">Dashboard &rarr;</a>
-            @else
-                <a href="{{ route('login') }}" class="btn-nav-login" style="text-align:center; padding: 0.625rem 0;">Log in</a>
-                <a href="{{ route('book-demo') }}" class="btn-orange" style="text-align:center; margin-bottom: 0.5rem;">Book Demo</a>
-                @if($playstoreUrl)
-                    <a href="{{ $playstoreUrl }}" target="_blank" rel="noopener" class="btn-outline" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; text-align: center; width: 100%;">
+            <?php if(auth()->guard()->check()): ?>
+                <a href="<?php echo e(route('dashboard')); ?>" class="btn-orange" style="text-align:center;">Dashboard &rarr;</a>
+            <?php else: ?>
+                <a href="<?php echo e(route('login')); ?>" class="btn-nav-login" style="text-align:center; padding: 0.625rem 0;">Log in</a>
+                <a href="<?php echo e(route('book-demo')); ?>" class="btn-orange" style="text-align:center; margin-bottom: 0.5rem;">Book Demo</a>
+                <?php if($playstoreUrl): ?>
+                    <a href="<?php echo e($playstoreUrl); ?>" target="_blank" rel="noopener" class="btn-outline" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; text-align: center; width: 100%;">
                         <svg viewBox="0 0 512 512" style="width: 1rem; height: 1rem; fill: var(--orange); flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
                             <path d="M325.3 234.3L104.6 13l280.8 161.2-60.1 60.1zM47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0zm425.2 225.6l-58 33.3-60.7-60.7 60.1-60.1 58.6 33.6c24.8 14.2 24.8 59.7 0 73.9zm-225 30.4L104.6 499l280.8-161.2-60.7-60.7-60.1 59.9z"/>
                         </svg>
                         <span>Google Play</span>
                     </a>
-                @endif
-            @endauth
+                <?php endif; ?>
+            <?php endif; ?>
         </div>
     </div>
 </div>
 
-@yield('content')
+<?php echo $__env->yieldContent('content'); ?>
 
 <footer class="crema-footer">
     <div class="container">
         <div class="footer-inner">
             <div class="footer-logo">
-                @if($siteLogo)
-                    <img src="{{ $siteLogo }}" alt="BeanVista POS Logo" style="height:1.5rem; width:auto; object-fit:contain;" />
-                @else
+                <?php if($siteLogo): ?>
+                    <img src="<?php echo e($siteLogo); ?>" alt="BeanVista POS Logo" style="height:1.5rem; width:auto; object-fit:contain;" />
+                <?php else: ?>
                     <div class="footer-logo-box" aria-hidden="true"></div>
                     <span class="footer-logo-txt">BeanVista POS</span>
-                @endif
+                <?php endif; ?>
             </div>
             <nav class="footer-links" aria-label="Footer">
-                <a href="{{ route('home') }}#faq">FAQ</a>
-                <a href="{{ route('docs') }}">Docs</a>
-                <a href="{{ route('about') }}">About</a>
-                <a href="{{ route('reviews') }}">Reviews</a>
-                <a href="{{ route('contact') }}">Contact</a>
-                <a href="{{ route('privacy') }}">Privacy Policy</a>
-                <a href="{{ route('terms') }}">T&amp;C</a>
+                <a href="<?php echo e(route('home')); ?>#faq">FAQ</a>
+                <a href="<?php echo e(route('docs')); ?>">Docs</a>
+                <a href="<?php echo e(route('about')); ?>">About</a>
+                <a href="<?php echo e(route('reviews')); ?>">Reviews</a>
+                <a href="<?php echo e(route('contact')); ?>">Contact</a>
+                <a href="<?php echo e(route('privacy')); ?>">Privacy Policy</a>
+                <a href="<?php echo e(route('terms')); ?>">T&amp;C</a>
             </nav>
-            @if($playstoreUrl)
+            <?php if($playstoreUrl): ?>
                 <div class="footer-playstore" style="margin: 0.5rem 0;">
-                    <a href="{{ $playstoreUrl }}" target="_blank" rel="noopener" aria-label="Get it on Google Play">
+                    <a href="<?php echo e($playstoreUrl); ?>" target="_blank" rel="noopener" aria-label="Get it on Google Play">
                         <img src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg" alt="Get it on Google Play" style="height: 2.25rem; width: auto; display: block;" />
                     </a>
                 </div>
-            @endif
-            <p class="footer-copy">&copy; {{ date('Y') }} BeanVista POS. All rights reserved.</p>
+            <?php endif; ?>
+            <p class="footer-copy">&copy; <?php echo e(date('Y')); ?> BeanVista POS. All rights reserved.</p>
         </div>
     </div>
 </footer>
@@ -604,6 +604,7 @@
 })();
 </script>
 
-@yield('scripts')
+<?php echo $__env->yieldContent('scripts'); ?>
 </body>
 </html>
+<?php /**PATH E:\Project\beanvista\resources\views/frontend.blade.php ENDPATH**/ ?>

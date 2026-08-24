@@ -145,7 +145,22 @@ class HandleInertiaRequests extends Middleware
                 }
 
                 if (!$tenantId) {
-                    return null;
+                    $cacheKey = 'settings_global';
+                    return cache()->remember($cacheKey, 60, function() {
+                        $settings = \App\Models\Setting::withoutGlobalScopes()->whereNull('tenant_id')->pluck('value', 'key')->toArray();
+                        
+                        if (empty($settings['site_name'])) {
+                            $settings['site_name'] = $settings['app_name'] ?? 'CaféOS';
+                        }
+
+                        if (isset($settings['site_logo']) && $settings['site_logo']) {
+                            $settings['site_logo'] = asset('storage/' . $settings['site_logo']);
+                        }
+                        if (isset($settings['site_favicon']) && $settings['site_favicon']) {
+                            $settings['site_favicon'] = asset('storage/' . $settings['site_favicon']);
+                        }
+                        return $settings;
+                    });
                 }
 
                 $cacheKey = 'settings_tenant_' . $tenantId;
@@ -164,12 +179,12 @@ class HandleInertiaRequests extends Middleware
                     // Always expose tenant_name so JS can distinguish it from the custom site_name
                     $settings['tenant_name'] = $tenantName;
 
-                    // Ensure image paths are absolute URLs
+                    // Ensure image paths are absolute URLs using asset()
                     if (isset($settings['site_logo']) && $settings['site_logo']) {
-                        $settings['site_logo'] = \Illuminate\Support\Facades\Storage::disk('public')->url($settings['site_logo']);
+                        $settings['site_logo'] = asset('storage/' . $settings['site_logo']);
                     }
                     if (isset($settings['site_favicon']) && $settings['site_favicon']) {
-                        $settings['site_favicon'] = \Illuminate\Support\Facades\Storage::disk('public')->url($settings['site_favicon']);
+                        $settings['site_favicon'] = asset('storage/' . $settings['site_favicon']);
                     }
                     return $settings;
                 });

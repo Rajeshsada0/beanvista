@@ -3,6 +3,45 @@ import { useState, useEffect, useMemo } from 'react';
 import { LayoutDashboard, Table, CalendarDays, ShoppingBag, Coffee, ChevronRight, ChevronDown, Menu as MenuIcon, X, Settings, User, BarChart3, ChefHat, LogIn, LogOut, Clock, Users, Gift, FolderOpen, ListPlus, Percent, ConciergeBell, Boxes, Building2, Activity, ChevronLeft, CreditCard, Monitor, Globe, Sparkles } from 'lucide-react';
 import Dropdown from '@/Components/Dropdown';
 
+const themeColors = {
+    daily_ops: {
+        bg: 'bg-rose-50/70 border border-rose-100/50 text-rose-700',
+        icon: 'text-rose-500',
+        hover: 'hover:bg-rose-50/30 hover:text-rose-600',
+        indicator: 'bg-rose-600 shadow-[2px_0_8px_rgba(244,63,94,0.5)]'
+    },
+    catalog_stock: {
+        bg: 'bg-amber-50/70 border border-amber-100/50 text-amber-700',
+        icon: 'text-amber-500',
+        hover: 'hover:bg-amber-50/30 hover:text-amber-600',
+        indicator: 'bg-amber-600 shadow-[2px_0_8px_rgba(245,158,11,0.5)]'
+    },
+    customers_mkt: {
+        bg: 'bg-emerald-50/70 border border-emerald-100/50 text-emerald-700',
+        icon: 'text-emerald-500',
+        hover: 'hover:bg-emerald-50/30 hover:text-emerald-600',
+        indicator: 'bg-emerald-600 shadow-[2px_0_8px_rgba(16,185,129,0.5)]'
+    },
+    business_analytics: {
+        bg: 'bg-blue-50/70 border border-blue-100/50 text-blue-700',
+        icon: 'text-blue-500',
+        hover: 'hover:bg-blue-50/30 hover:text-blue-600',
+        indicator: 'bg-blue-600 shadow-[2px_0_8px_rgba(59,130,246,0.5)]'
+    },
+    settings_system: {
+        bg: 'bg-slate-50/70 border border-slate-100/50 text-slate-700',
+        icon: 'text-slate-500',
+        hover: 'hover:bg-slate-50/30 hover:text-slate-600',
+        indicator: 'bg-slate-600 shadow-[2px_0_8px_rgba(100,116,139,0.5)]'
+    },
+    super_admin: {
+        bg: 'bg-purple-50/70 border border-purple-100/50 text-purple-700',
+        icon: 'text-purple-500',
+        hover: 'hover:bg-purple-50/30 hover:text-purple-600',
+        indicator: 'bg-purple-600 shadow-[2px_0_8px_rgba(168,85,247,0.5)]'
+    }
+};
+
 export default function AuthenticatedLayout({ children }) {
     const { auth, settings, active_orders_count, cancelled_orders_count, completed_today_count, kds_items_count, service_ready_count } = usePage().props;
     const user = auth.user;
@@ -121,10 +160,10 @@ export default function AuthenticatedLayout({ children }) {
                     name: 'Orders', 
                     href: route('orders.index'), 
                     icon: ShoppingBag, 
-                    active: route().current('orders.*') && !route().current('orders.kds') && !route().current('orders.service'), 
+                    active: route().current('orders.*') && !route().current('orders.create') && !route().current('orders.edit') && !route().current('orders.kds') && !route().current('orders.service'), 
                     hideSuperAdmin: true
                 },
-                { name: 'Table Book', href: route('table-book'), icon: Table, active: route().current('table-book'), hideSuperAdmin: true },
+                { name: 'Table Book', href: route('table-book'), icon: Table, active: route().current('table-book') || route().current('orders.create') || route().current('orders.edit'), hideSuperAdmin: true },
                 { name: 'Reservations', href: route('reservations.index'), icon: CalendarDays, active: route().current('reservations.*'), hideSuperAdmin: true },
                 { name: 'Kitchen KDS', href: route('orders.kds'), icon: ChefHat, active: route().current('orders.kds'), hideSuperAdmin: true, badge: kds_items_count, badgeColor: 'bg-amber-500' },
                 { name: 'Service View', href: route('orders.service'), icon: ConciergeBell, active: route().current('orders.service'), hideSuperAdmin: true, badge: service_ready_count, badgeColor: 'bg-blue-500' },
@@ -461,26 +500,26 @@ export default function AuthenticatedLayout({ children }) {
                                                                 isSidebarCollapsed ? 'justify-center px-3 py-3' : 'space-x-3 px-3 py-2.5'
                                                             } ${
                                                                 item.active
-                                                                ? 'bg-gradient-to-br from-white/90 to-white/50 text-brand-700 shadow-[0_4px_20px_-4px_rgba(79,70,229,0.15)] border border-white/80'
-                                                                : 'text-gray-500 hover:bg-white/40 hover:text-brand-600 border border-transparent hover:shadow-sm'
+                                                                ? `${themeColors[section.id]?.bg || 'bg-brand-50 text-brand-700'} shadow-sm font-bold`
+                                                                : `text-gray-500 hover:bg-gray-50 border border-transparent ${themeColors[section.id]?.hover || 'hover:text-brand-600'} hover:shadow-xs`
                                                             }`}
                                                         >
                                                             {item.active && !isSidebarCollapsed && (
-                                                                <div className="absolute left-0 top-1/2 -mt-3.5 h-7 w-[4px] rounded-r-full bg-brand-600 shadow-[2px_0_8px_rgba(79,70,229,0.5)]" />
+                                                                <div className={`absolute left-0 top-1/2 -mt-3.5 h-7 w-[4px] rounded-r-full ${themeColors[section.id]?.indicator || 'bg-brand-600 shadow-[2px_0_8px_rgba(79,70,229,0.5)]'}`} />
                                                             )}
                                                             {item.active && isSidebarCollapsed && (
-                                                                <div className="absolute left-0 top-1/2 -mt-4 h-8 w-[3px] rounded-r-full bg-brand-600" />
+                                                                <div className={`absolute left-0 top-1/2 -mt-4 h-8 w-[3px] rounded-r-full ${themeColors[section.id]?.indicator || 'bg-brand-600'}`} />
                                                             )}
-                                                            <Icon className={`h-5 w-5 shrink-0 ${item.active ? 'scale-110' : ''}`} strokeWidth={item.active ? 2.5 : 2} />
+                                                            <Icon className={`h-5 w-5 shrink-0 transition-transform duration-200 ${item.active ? `${themeColors[section.id]?.icon || 'text-brand-600'} scale-110` : 'text-gray-400 group-hover:text-gray-700 group-hover:scale-110'}`} strokeWidth={item.active ? 2.5 : 2} />
                                                             {!isSidebarCollapsed && (
                                                                 <>
-                                                                    <span className={`font-semibold tracking-wide flex-1 text-xs sm:text-sm ${item.active ? 'text-brand-900 font-bold' : ''}`}>{item.name}</span>
+                                                                    <span className={`font-semibold tracking-wide flex-1 text-xs sm:text-sm transition-colors duration-200 ${item.active ? 'text-gray-950 font-extrabold' : 'text-gray-600 group-hover:text-gray-900'}`}>{item.name}</span>
                                                                     {item.badge > 0 && !item.submenu && (
                                                                         <span className={`px-2 py-0.5 text-[10px] font-black text-white rounded-full ${item.badgeColor || 'bg-brand-500'} ${item.active ? 'mr-6' : ''}`}>
                                                                             {item.badge}
                                                                         </span>
                                                                     )}
-                                                                    {item.active && !item.submenu && <ChevronRight className="absolute right-4 h-4 w-4 opacity-40 text-brand-700" strokeWidth={3} />}
+                                                                    {item.active && !item.submenu && <ChevronRight className={`absolute right-4 h-4 w-4 opacity-40 ${themeColors[section.id]?.icon || 'text-brand-700'}`} strokeWidth={3} />}
                                                                 </>
                                                             )}
                                                             {isSidebarCollapsed && item.badge > 0 && (
@@ -497,10 +536,10 @@ export default function AuthenticatedLayout({ children }) {
                                                                         key={sub.name}
                                                                         href={sub.href}
                                                                         onClick={() => setIsMobileOpen(false)}
-                                                                        className={`group flex items-center justify-between rounded-lg px-3 py-2 text-xs outline-none transition-colors ${
+                                                                        className={`group flex items-center justify-between rounded-lg px-3 py-2 text-xs outline-none transition-all duration-200 border-l border-gray-100 ${
                                                                             sub.active 
-                                                                            ? 'bg-brand-50 text-brand-700 font-bold' 
-                                                                            : 'text-gray-500 hover:bg-white/50 hover:text-brand-600 font-medium'
+                                                                            ? `${themeColors[section.id]?.bg || 'bg-brand-50 text-brand-700'} font-bold` 
+                                                                            : `text-gray-500 ${themeColors[section.id]?.hover || 'hover:bg-white/50 hover:text-brand-600'} font-medium`
                                                                         }`}
                                                                     >
                                                                         <span>{sub.name}</span>

@@ -10,6 +10,12 @@ export default function EditOrder({ order, menus, table, customers, categories, 
     const isCreate = !order;
     const currentTable = isCreate ? table : order.table;
     
+    const getFallbackImage = (itemName) => {
+        const name = (itemName || '').toLowerCase();
+        if (name.includes('tea')) return '/images/tea.png';
+        return '/images/coffee.png';
+    };
+    
     const [cart, setCart] = useState(
         isCreate ? [] : order.items.map(i => ({
             id: 'old_' + i.id,          // Unique UI key for this cart line
@@ -393,25 +399,33 @@ export default function EditOrder({ order, menus, table, customers, categories, 
 
             <div className="flex flex-col space-y-6 lg:h-[calc(100vh-140px)] pb-48 sm:pb-0">
                 {/* Header */}
-                <div className="bg-white/60 backdrop-blur-xl p-4 sm:p-5 rounded-3xl border border-white/80 shadow-sm shrink-0">
+                <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm shrink-0">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex items-center space-x-3 sm:space-x-4">
-                            <button onClick={handleBack} className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100/80 hover:bg-gray-200 focus:bg-gray-200 focus:ring-4 focus:ring-gray-500/30 text-gray-600 hover:text-gray-900 transition-all duration-200 shadow-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed">
+                        <div className="flex items-center space-x-4">
+                            <button 
+                                onClick={handleBack} 
+                                className="flex h-10 w-10 items-center justify-center rounded-2xl border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-all duration-200 shadow-xs outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Back to Table Book"
+                            >
                                 <ArrowLeft className="w-5 h-5" />
                             </button>
                             <div className="min-w-0">
-                                <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">
+                                <h1 className="text-2xl font-black text-gray-950 tracking-tight leading-none mb-1.5">
                                     Table {currentTable?.table_number}
                                 </h1>
-                                <div className="flex items-center mt-1 space-x-2">
-                                    <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-md ${
-                                        isCreate ? 'bg-brand-100 text-brand-800' :
-                                        order.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 
-                                        order.status === 'preparing' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                                <div className="flex items-center space-x-2">
+                                    <span className={`px-2.5 py-1 text-[9px] font-black uppercase tracking-wider rounded-xl border ${
+                                        isCreate 
+                                        ? 'bg-red-50 text-red-600 border-red-100' 
+                                        : order.status === 'completed' 
+                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                                        : order.status === 'preparing' 
+                                        ? 'bg-amber-50 text-amber-600 border-amber-100' 
+                                        : 'bg-blue-50 text-blue-600 border-blue-100'
                                     }`}>
                                         {isCreate ? 'NEW ORDER' : order.status}
                                     </span>
-                                    {!isCreate && <span className="text-xs font-semibold text-gray-500">#{order.order_number || order.id.toString().slice(-8)}</span>}
+                                    {!isCreate && <span className="text-xs font-bold text-gray-400">#{order.order_number || order.id.toString().slice(-8)}</span>}
                                 </div>
                             </div>
                         </div>
@@ -449,13 +463,15 @@ export default function EditOrder({ order, menus, table, customers, categories, 
                     {/* Left: Menu Items Select */}
                     <div className="lg:col-span-8 flex flex-col bg-white/60 backdrop-blur-xl rounded-3xl border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.04)] overflow-hidden order-2 lg:order-1">
                         {/* Tabs */}
-                        <div className="flex px-4 pt-4 border-b border-gray-200/50 overflow-x-auto custom-scrollbar shrink-0">
+                        <div className="flex px-6 border-b border-gray-100 overflow-x-auto custom-scrollbar shrink-0 gap-2 bg-gray-50/40">
                             {[{id: 'all', name: 'All'}, ...activeCategories].map(cat => (
                                 <button
                                     key={cat.id || cat.name}
                                     onClick={() => setActiveTab(cat.name)}
-                                    className={`px-4 sm:px-6 py-3 text-sm font-bold uppercase tracking-wider focus:outline-none transition-colors border-b-2 whitespace-nowrap focus:ring-2 focus:ring-brand-500/30 focus:ring-offset-2 ${
-                                        activeTab === cat.name ? 'border-brand-600 text-brand-700 bg-brand-50' : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                                    className={`relative px-5 py-4 text-xs font-black uppercase tracking-widest focus:outline-none transition-all duration-200 whitespace-nowrap border-b-2 ${
+                                        activeTab === cat.name 
+                                        ? 'border-red-600 text-red-600 font-extrabold' 
+                                        : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-200'
                                     }`}
                                 >
                                     {cat.name}
@@ -466,13 +482,13 @@ export default function EditOrder({ order, menus, table, customers, categories, 
                         {/* Menu Grid */}
                         <div className="flex-1 p-4 sm:p-6 overflow-y-auto">
                             {!menus ? (
-                                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                                    {[...Array(8)].map((_, i) => (
-                                        <div key={i} className="animate-pulse bg-gray-100 rounded-2xl h-32 w-full"></div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                    {[...Array(10)].map((_, i) => (
+                                        <div key={i} className="animate-pulse bg-gray-100 rounded-2xl h-48 w-full"></div>
                                     ))}
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                                     {filteredMenu.map(menuItem => {
                                         const outOfStock = isOutOfStock(menuItem);
                                         return (
@@ -480,33 +496,51 @@ export default function EditOrder({ order, menus, table, customers, categories, 
                                                 key={menuItem.id}
                                                 onClick={() => handleMenuClick(menuItem)}
                                                 disabled={outOfStock}
-                                                className={`group relative flex flex-col items-start p-3 sm:p-4 text-left rounded-2xl bg-white shadow-sm border border-gray-100 transition-all duration-300 outline-none ${
+                                                className={`group flex flex-col text-left rounded-2xl bg-white shadow-sm border border-gray-100 transition-all duration-300 overflow-hidden outline-none ${
                                                     outOfStock
-                                                        ? 'opacity-50 cursor-not-allowed bg-gray-50 border-gray-200'
-                                                        : 'hover:border-brand-300 hover:shadow-md focus:border-brand-500 focus:shadow-lg focus:ring-4 focus:ring-brand-500/20 active:scale-[0.98]'
+                                                        ? 'opacity-50 cursor-not-allowed bg-gray-50'
+                                                        : 'hover:border-red-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]'
                                                 }`}
                                             >
-                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-transform ${
-                                                    outOfStock
-                                                        ? 'bg-gray-200 text-gray-400'
-                                                        : 'bg-brand-50 text-brand-500 group-hover:scale-110'
-                                                }`}>
-                                                    <Coffee className="w-5 h-5" strokeWidth={2.5}/>
-                                                </div>
-                                                <h3 className="text-sm font-bold text-gray-900 leading-tight mb-1">{menuItem.name}</h3>
-                                                <p className={`text-sm font-black ${outOfStock ? 'text-gray-400' : 'text-brand-600'}`}>
-                                                    {currency} {menuItem.price}
-                                                </p>
-                                                
-                                                {outOfStock ? (
-                                                    <span className="absolute top-2 right-2 px-1.5 py-0.5 text-[8px] font-black uppercase bg-red-100 text-red-600 rounded">
-                                                        Out of Stock
-                                                    </span>
-                                                ) : (
-                                                    <div className="absolute top-2 right-2 flex items-center justify-center w-6 h-6 rounded-full bg-gray-50 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <Plus className="w-3.5 h-3.5 text-gray-600" />
+                                                {/* Image Block */}
+                                                <div className="w-full aspect-[4/3] bg-gray-100 overflow-hidden relative">
+                                                    <img 
+                                                        src={menuItem.image_url || getFallbackImage(menuItem.name)} 
+                                                        alt={menuItem.name} 
+                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                                                    />
+                                                    
+                                                    {/* Badge overlay on lower-left portion of the image */}
+                                                    <div className="absolute bottom-2 left-2 w-7 h-7 rounded-full bg-white border border-red-50 flex items-center justify-center shadow-sm">
+                                                        <Coffee className="w-4 h-4 text-red-500" strokeWidth={2.5}/>
                                                     </div>
-                                                )}
+
+                                                    {outOfStock && (
+                                                        <span className="absolute top-2 right-2 px-1.5 py-0.5 text-[8px] font-black uppercase bg-red-100 text-red-600 rounded">
+                                                            Out of Stock
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Details Block */}
+                                                <div className="p-3 w-full flex flex-col justify-between flex-grow">
+                                                    <div>
+                                                        <h3 className="text-xs sm:text-sm font-extrabold text-gray-900 leading-tight mb-1 group-hover:text-red-600 transition-colors line-clamp-2">
+                                                            {menuItem.name}
+                                                        </h3>
+                                                    </div>
+                                                    <div className="flex items-center justify-between mt-2 w-full">
+                                                        <span className="text-xs sm:text-sm font-black text-red-600">
+                                                            {currency} {menuItem.price}
+                                                        </span>
+                                                        
+                                                        {!outOfStock && (
+                                                            <div className="flex items-center justify-center w-6 h-6 rounded-full bg-red-50 group-hover:bg-red-500 transition-colors">
+                                                                <Plus className="w-3.5 h-3.5 text-red-600 group-hover:text-white transition-colors" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </button>
                                         );
                                     })}

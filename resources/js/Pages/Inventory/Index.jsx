@@ -10,14 +10,14 @@ import {
 import { useState, useEffect, useMemo } from 'react';
 
 export default function InventoryIndex({ 
-    stats, items, recentPurchases, recentUsages, filters, 
+    stats, items, recentPurchases, recentUsages, recentWastes = [], filters, 
     suppliers = [], measuringUnits = [], stockGroups = [],
     menus = [], menuRecipes = []
 }) {
     const { settings } = usePage().props;
     const currency = settings?.currency_symbol || 'रू.';
     const [activeTab, setActiveTab] = useState('today'); 
-    // Tabs: 'today', 'stock', 'intake', 'usage', 'suppliers', 'settings'
+    // Tabs: 'today', 'stock', 'intake', 'usage', 'waste', 'suppliers', 'settings', 'recipes'
 
     const formatCurrency = (amount) => {
         return `${currency} ${parseFloat(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -115,6 +115,20 @@ export default function InventoryIndex({
 
     const usageForm = useForm({
         inventory_item_id: '', quantity_used: '', usage_date: new Date().toISOString().split('T')[0], notes: ''
+    });
+
+    const [editingWaste, setEditingWaste] = useState(null);
+    const [wasteType, setWasteType] = useState('raw'); // 'raw' or 'menu'
+
+    const wasteForm = useForm({
+        inventory_item_id: '',
+        menu_id: '',
+        quantity: '',
+        cost_per_unit: '',
+        total_loss: '',
+        waste_date: new Date().toISOString().split('T')[0],
+        reason: 'Spoiled',
+        notes: ''
     });
 
     const supplierForm = useForm({
@@ -258,6 +272,72 @@ export default function InventoryIndex({
                 onSuccess: () => usageForm.reset('quantity_used', 'notes')
             });
         }
+    };
+
+    const submitWaste = (e) => {
+        e.preventDefault();
+        const payload = {
+            ...wasteForm.data,
+            inventory_item_id: wasteType === 'raw' ? wasteForm.data.inventory_item_id : null,
+            menu_id: wasteType === 'menu' ? wasteForm.data.menu_id : null,
+        };
+
+        if (editingWaste) {
+            wasteForm.put(route('inventory.wastes.update', editingWaste.id), {
+                onSuccess: () => { setEditingWaste(null); wasteForm.reset(); }
+            });
+        } else {
+            wasteForm.post(route('inventory.wastes.store'), {
+                onSuccess: () => wasteForm.reset()
+            });
+        }
+    };
+
+    const deleteWaste = (waste) => {
+        if (confirm('Are you sure you want to delete this waste record? This will restore the stock levels and delete the linked journal entries.')) {
+            router.delete(route('inventory.wastes.destroy', waste.id));
+        }
+    };
+
+    const handleWasteItemSelect = (itemId, type) => {
+        if (type === 'raw') {
+            let lastPrice = 0;
+            if (recentPurchases && recentPurchases.length > 0) {
+                const lp = recentPurchases.find(p => String(p.inventory_item_id) === String(itemId));
+                if (lp) lastPrice = lp.unit_price;
+            }
+            const found = items.find(i => String(i.id) === String(itemId));
+            const qty = wasteForm.data.quantity || 0;
+            wasteForm.setData(data => ({
+                ...data,
+                inventory_item_id: itemId,
+                menu_id: '',
+                cost_per_unit: lastPrice || 0,
+                total_loss: (parseFloat(qty) * lastPrice).toFixed(2)
+            }));
+        } else {
+            const found = menus.find(m => String(m.id) === String(itemId));
+            const cost = found ? (found.cost_price || 0) : 0;
+            const qty = wasteForm.data.quantity || 0;
+            wasteForm.setData(data => ({
+                ...data,
+                menu_id: itemId,
+                inventory_item_id: '',
+                cost_per_unit: cost,
+                total_loss: (parseFloat(qty) * cost).toFixed(2)
+            }));
+        }
+    };
+
+    const calculateWasteTotal = (qty, price) => {
+        const q = parseFloat(qty) || 0;
+        const p = parseFloat(price) || 0;
+        wasteForm.setData(data => ({
+            ...data,
+            quantity: qty,
+            cost_per_unit: price,
+            total_loss: (q * p).toFixed(2)
+        }));
     };
 
     // Submits (Config)
@@ -426,6 +506,7 @@ export default function InventoryIndex({
                         { id: 'stock',     label: "Master Stock",   icon: Boxes },
                         { id: 'intake',    label: "Stock Intake",   icon: TrendingUp },
                         { id: 'usage',     label: "Consumption",    icon: TrendingDown },
+                        { id: 'waste',     label: "Food Waste & Loss", icon: AlertTriangle },
                         { id: 'recipes',   label: "Recipes",        icon: ChefHat },
                         { id: 'suppliers', label: "Suppliers",      icon: Truck },
                         { id: 'settings',  label: "Configuration",  icon: Settings }
@@ -793,6 +874,287 @@ export default function InventoryIndex({
                                                     </td>
                                                 </tr>
                                             ))}
+                                        </Deferred>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* TAB: FOOD WASTE & LOSS */}
+                    {activeTab === 'waste' && (
+                        <div className="flex flex-col lg:flex-row h-full">
+                            {/* Left panel: Log Waste Form */}
+                            <div className="w-full lg:w-1/3 bg-amber-50/30 p-6 border-r border-amber-100">
+                                <h3 className="font-black text-amber-900 mb-4 flex items-center">
+                                    <AlertTriangle className="w-5 h-5 mr-2 text-amber-600"/> 
+                                    {editingWaste ? 'Edit Waste/Damage Log' : 'Log Waste & Damage'}
+                                </h3>
+                                
+                                <form onSubmit={submitWaste} className="space-y-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black tracking-widest text-amber-700 uppercase mb-2">Item Type</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button 
+                                                type="button" 
+                                                onClick={() => {
+                                                    setWasteType('raw');
+                                                    wasteForm.setData(data => ({ ...data, inventory_item_id: '', menu_id: '', cost_per_unit: '', total_loss: '' }));
+                                                }}
+                                                className={`py-2 px-3 text-xs font-black rounded-xl border text-center transition-all ${
+                                                    wasteType === 'raw' 
+                                                    ? 'bg-amber-600 text-white border-amber-600' 
+                                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                Raw Material
+                                            </button>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => {
+                                                    setWasteType('menu');
+                                                    wasteForm.setData(data => ({ ...data, inventory_item_id: '', menu_id: '', cost_per_unit: '', total_loss: '' }));
+                                                }}
+                                                className={`py-2 px-3 text-xs font-black rounded-xl border text-center transition-all ${
+                                                    wasteType === 'menu' 
+                                                    ? 'bg-amber-600 text-white border-amber-600' 
+                                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                Menu Item
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[10px] font-black tracking-widest text-amber-700 uppercase mb-2">
+                                            Select {wasteType === 'raw' ? 'Ingredient' : 'Menu Item'}
+                                        </label>
+                                        {wasteType === 'raw' ? (
+                                            <select 
+                                                required 
+                                                className="w-full rounded-xl border-amber-200 focus:ring-amber-500 text-sm bg-white" 
+                                                value={wasteForm.data.inventory_item_id} 
+                                                onChange={e => handleWasteItemSelect(e.target.value, 'raw')}
+                                            >
+                                                <option value="">Select Ingredient</option>
+                                                {items.map(m => <option key={m.id} value={m.id}>{m.name} ({m.current_stock} {m.measuring_unit?.short_name || m.unit} avail)</option>)}
+                                            </select>
+                                        ) : (
+                                            <select 
+                                                required 
+                                                className="w-full rounded-xl border-amber-200 focus:ring-amber-500 text-sm bg-white" 
+                                                value={wasteForm.data.menu_id} 
+                                                onChange={e => handleWasteItemSelect(e.target.value, 'menu')}
+                                            >
+                                                <option value="">Select Menu Item</option>
+                                                {menus.map(m => <option key={m.id} value={m.id}>{m.name} ({formatCurrency(m.cost_price || 0)} cost)</option>)}
+                                            </select>
+                                        )}
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-[10px] font-black tracking-widest text-amber-700 uppercase mb-2">Quantity Wasted</label>
+                                            <input 
+                                                type="number" 
+                                                step="0.01" 
+                                                required 
+                                                placeholder="Qty (e.g. 2)" 
+                                                className="w-full rounded-xl border-amber-200 focus:ring-amber-500 text-sm" 
+                                                value={wasteForm.data.quantity} 
+                                                onChange={e => calculateWasteTotal(e.target.value, wasteForm.data.cost_per_unit)} 
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black tracking-widest text-amber-700 uppercase mb-2">Date</label>
+                                            <input 
+                                                type="date" 
+                                                required 
+                                                className="w-full rounded-xl border-amber-200 focus:ring-amber-500 text-sm" 
+                                                value={wasteForm.data.waste_date} 
+                                                onChange={e => wasteForm.setData('waste_date', e.target.value)} 
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-[10px] font-black tracking-widest text-amber-700 uppercase mb-2">Cost Price / Unit</label>
+                                            <input 
+                                                type="number" 
+                                                step="0.01" 
+                                                required 
+                                                placeholder="Unit Cost" 
+                                                className="w-full rounded-xl border-amber-200 focus:ring-amber-500 text-sm" 
+                                                value={wasteForm.data.cost_per_unit} 
+                                                onChange={e => calculateWasteTotal(wasteForm.data.quantity, e.target.value)} 
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black tracking-widest text-amber-700 uppercase mb-2">Total Financial Loss</label>
+                                            <div className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold text-gray-600">
+                                                {formatCurrency(wasteForm.data.total_loss || 0)}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[10px] font-black tracking-widest text-amber-700 uppercase mb-2">Reason for Waste</label>
+                                        <select 
+                                            required 
+                                            className="w-full rounded-xl border-amber-200 focus:ring-amber-500 text-sm bg-white" 
+                                            value={wasteForm.data.reason} 
+                                            onChange={e => wasteForm.setData('reason', e.target.value)}
+                                        >
+                                            <option value="Spoiled">Spoiled / Rotten</option>
+                                            <option value="Expired">Expired</option>
+                                            <option value="Spilled/Dropped">Spilled or Dropped</option>
+                                            <option value="Burnt/Ruined">Burnt or Ruined in Kitchen</option>
+                                            <option value="Customer Rejection">Customer Rejection</option>
+                                            <option value="Other">Other (Damage/Loss)</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[10px] font-black tracking-widest text-amber-700 uppercase mb-2">Notes</label>
+                                        <textarea 
+                                            placeholder="Write details about the waste/damage (optional)" 
+                                            rows="2"
+                                            className="w-full rounded-xl border-amber-200 focus:ring-amber-500 text-sm" 
+                                            value={wasteForm.data.notes || ''} 
+                                            onChange={e => wasteForm.setData('notes', e.target.value)} 
+                                        />
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <button 
+                                            type="submit" 
+                                            disabled={wasteForm.processing} 
+                                            className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-amber-500/20"
+                                        >
+                                            {editingWaste ? 'Update Log' : 'Log Waste'}
+                                        </button>
+                                        {editingWaste && (
+                                            <button 
+                                                type="button" 
+                                                onClick={() => {
+                                                    setEditingWaste(null);
+                                                    wasteForm.reset();
+                                                }} 
+                                                className="px-4 bg-amber-200 hover:bg-amber-300 text-amber-800 font-bold rounded-xl transition-all"
+                                            >
+                                                Cancel
+                                            </button>
+                                        )}
+                                    </div>
+                                </form>
+                            </div>
+
+                            {/* Right panel: Waste Logs List */}
+                            <div className="w-full lg:w-2/3 p-0 overflow-x-auto">
+                                <div className="p-6 bg-amber-50/10 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                    <div>
+                                        <h4 className="font-black text-gray-900">Recent Waste &amp; Damage Logs</h4>
+                                        <p className="text-xs text-gray-500">Tracked losses and ingredient write-offs</p>
+                                    </div>
+                                    <div className="bg-amber-100/60 border border-amber-200 px-4 py-2 rounded-2xl flex items-center space-x-3 text-amber-900">
+                                        <AlertTriangle className="w-5 h-5 text-amber-600" />
+                                        <div>
+                                            <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest block leading-none">Losses (Selected Period)</span>
+                                            <span className="text-sm font-bold block mt-0.5">{formatCurrency(stats.custom?.wasted ?? stats.today?.wasted ?? 0)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-gray-50 border-b border-gray-100">
+                                        <tr>
+                                            <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-gray-400">Date</th>
+                                            <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-gray-400">Item Details</th>
+                                            <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-gray-400">Type</th>
+                                            <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-amber-600">Loss Amount</th>
+                                            <th className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-gray-400">Reason</th>
+                                            <th className="px-6 py-4 text-right"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        <Deferred data="recentWastes" fallback={<tr><td colSpan="6" className="px-6 py-10 text-center text-xs font-bold text-gray-400 animate-pulse">Loading recent waste logs...</td></tr>}>
+                                            {recentWastes?.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan="6" className="px-6 py-10 text-center text-sm font-bold text-gray-400">
+                                                        No food waste or damaged items logged for this period.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                recentWastes?.map(log => (
+                                                    <tr key={log.id} className="hover:bg-amber-50/10">
+                                                        <td className="px-6 py-3 font-bold text-gray-500 text-xs">
+                                                            {new Date(log.waste_date).toLocaleDateString()}
+                                                        </td>
+                                                        <td className="px-6 py-3">
+                                                            <div className="font-black text-gray-900">
+                                                                {log.inventory_item ? log.inventory_item.name : (log.menu ? log.menu.name : 'Unknown')}
+                                                            </div>
+                                                            <div className="text-[10px] text-gray-400 mt-0.5">
+                                                                Qty: {log.quantity} {log.inventory_item ? (log.inventory_item.measuring_unit?.short_name || log.inventory_item.unit) : 'pcs'}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-3 text-xs">
+                                                            <span className={`px-2 py-0.5 rounded-full font-bold uppercase tracking-wider text-[9px] ${
+                                                                log.inventory_item 
+                                                                ? 'bg-blue-50 text-blue-600 border border-blue-100' 
+                                                                : 'bg-indigo-50 text-indigo-600 border border-indigo-100'
+                                                            }`}>
+                                                                {log.inventory_item ? 'Raw Ingredient' : 'Menu Item'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-3 font-black text-amber-600">
+                                                            {formatCurrency(log.total_loss)}
+                                                            <div className="text-[10px] text-gray-400 font-normal mt-0.5">
+                                                                {formatCurrency(log.cost_per_unit)}/unit
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-3 text-xs font-bold">
+                                                            <span className="bg-red-50 text-red-600 border border-red-100 px-2.5 py-1 rounded-lg">
+                                                                {log.reason}
+                                                            </span>
+                                                            {log.notes && (
+                                                                <div className="text-[10px] text-gray-400 font-normal mt-1 max-w-xs truncate" title={log.notes}>
+                                                                    {log.notes}
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-6 py-3 text-right space-x-2">
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setEditingWaste(log);
+                                                                    setWasteType(log.inventory_item_id ? 'raw' : 'menu');
+                                                                    wasteForm.setData({
+                                                                        inventory_item_id: log.inventory_item_id || '',
+                                                                        menu_id: log.menu_id || '',
+                                                                        quantity: log.quantity,
+                                                                        cost_per_unit: log.cost_per_unit,
+                                                                        total_loss: log.total_loss,
+                                                                        waste_date: log.waste_date.split('T')[0],
+                                                                        reason: log.reason,
+                                                                        notes: log.notes || ''
+                                                                    });
+                                                                }} 
+                                                                className="text-blue-400 hover:text-blue-600"
+                                                            >
+                                                                <Edit3 className="w-4 h-4 inline"/>
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => deleteWaste(log)} 
+                                                                className="text-rose-400 hover:text-rose-600"
+                                                            >
+                                                                <Trash2 className="w-4 h-4 inline"/>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
                                         </Deferred>
                                     </tbody>
                                 </table>

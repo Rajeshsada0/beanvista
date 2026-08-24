@@ -32,7 +32,7 @@ class UserController extends Controller
             'users' => $users,
             'app_name' => $appName,
             'app_version' => $appVersion,
-            'site_favicon' => $siteFavicon ? \Illuminate\Support\Facades\Storage::disk('public')->url($siteFavicon) : null,
+            'site_favicon' => $siteFavicon ? asset('storage/' . $siteFavicon) : null,
             'enable_biometric' => $enableBiometric,
             'enable_contact_call' => $enableContactCall,
             'contact_call_number' => $contactCallNumber,

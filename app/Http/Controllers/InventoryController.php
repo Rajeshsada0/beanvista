@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
 use App\Models\InventoryPurchase;
 use App\Models\InventoryUsage;
+use App\Models\InventoryWaste;
 use App\Models\Menu;
 use App\Models\MenuRecipe;
 use App\Models\Order;
@@ -34,17 +35,21 @@ class InventoryController extends Controller
         // ── Financial Stats ────────────────────────────────────────────────
         $todayExpenses   = InventoryPurchase::whereDate('purchase_date', $today)->sum('total_price');
         $todaySales      = Order::where('status','completed')->whereDate('updated_at', $today)->sum('grand_total');
+        $todayWasted     = InventoryWaste::whereDate('waste_date', $today)->sum('total_loss');
 
         $monthlyExpenses = InventoryPurchase::where('purchase_date', '>=', $startOfMonth)->sum('total_price');
         $monthlySales    = Order::where('status','completed')->where('updated_at', '>=', $startOfMonth)->sum('grand_total');
+        $monthlyWasted   = InventoryWaste::where('waste_date', '>=', $startOfMonth)->sum('total_loss');
 
         $yearlyExpenses  = InventoryPurchase::where('purchase_date', '>=', $startOfYear)->sum('total_price');
         $yearlySales     = Order::where('status','completed')->where('updated_at', '>=', $startOfYear)->sum('grand_total');
+        $yearlyWasted    = InventoryWaste::where('waste_date', '>=', $startOfYear)->sum('total_loss');
 
-        $customExpenses = $customSales = null;
+        $customExpenses = $customSales = $customWasted = null;
         if ($queryStart && $queryEnd) {
             $customExpenses = InventoryPurchase::whereBetween('purchase_date', [$queryStart, $queryEnd])->sum('total_price');
             $customSales    = Order::where('status','completed')->whereBetween('updated_at', [$queryStart, $queryEnd])->sum('grand_total');
+            $customWasted   = InventoryWaste::whereBetween('waste_date', [$queryStart, $queryEnd])->sum('total_loss');
         }
 
         // ── Per-Item Aggregates (SQL-driven Native Aggregation) ──────────────
@@ -138,17 +143,24 @@ class InventoryController extends Controller
         }
         $recentUsages = $usagesQuery->latest('usage_date')->latest('id')->take(200)->get();
 
-        $menus       = Menu::orderBy('name')->get(['id', 'name', 'category']);
+        // ── Wastes Log ─────────────────────────────────────────────────────
+        $wastesQuery = InventoryWaste::with(['inventoryItem', 'menu']);
+        if ($queryStart && $queryEnd) {
+            $wastesQuery->whereBetween('waste_date', [$queryStart, $queryEnd]);
+        }
+        $recentWastes = $wastesQuery->latest('waste_date')->latest('id')->take(200)->get();
+
+        $menus       = Menu::orderBy('name')->get(['id', 'name', 'category', 'cost_price']);
         $menuRecipes = MenuRecipe::with(['menu:id,name', 'inventoryItem:id,name,unit,measuring_unit_id', 'inventoryItem.measuringUnit'])
             ->get();
 
         return Inertia::render('Inventory/Index', [
             'stats' => [
-                'today'  => ['sales' => (float)$todaySales,    'expenses' => (float)$todayExpenses],
-                'month'  => ['sales' => (float)$monthlySales,   'expenses' => (float)$monthlyExpenses],
-                'year'   => ['sales' => (float)$yearlySales,    'expenses' => (float)$yearlyExpenses],
+                'today'  => ['sales' => (float)$todaySales,    'expenses' => (float)$todayExpenses,    'wasted' => (float)$todayWasted],
+                'month'  => ['sales' => (float)$monthlySales,   'expenses' => (float)$monthlyExpenses,   'wasted' => (float)$monthlyWasted],
+                'year'   => ['sales' => (float)$yearlySales,    'expenses' => (float)$yearlyExpenses,    'wasted' => (float)$yearlyWasted],
                 'custom' => $customSales !== null
-                    ? ['sales' => (float)$customSales, 'expenses' => (float)$customExpenses]
+                    ? ['sales' => (float)$customSales, 'expenses' => (float)$customExpenses, 'wasted' => (float)$customWasted]
                     : null,
             ],
             'items'           => $items,
@@ -157,6 +169,7 @@ class InventoryController extends Controller
             'stockGroups'     => Inertia::defer(fn() => $stockGroups),
             'recentPurchases' => Inertia::defer(fn() => $recentPurchases),
             'recentUsages'    => Inertia::defer(fn() => $recentUsages),
+            'recentWastes'    => Inertia::defer(fn() => $recentWastes),
             'menus'           => $menus,
             'menuRecipes'     => $menuRecipes,
             'filters'         => [
@@ -490,5 +503,178 @@ class InventoryController extends Controller
     {
         $recipe->delete();
         return redirect()->back()->with('success', 'Ingredient removed.');
+    }
+
+    public function storeWaste(Request $request)
+    {
+        $validated = $request->validate([
+            'inventory_item_id' => 'nullable|exists:inventory_items,id',
+            'menu_id'           => 'nullable|exists:menus,id',
+            'quantity'          => 'required|numeric|min:0.01',
+            'cost_per_unit'     => 'required|numeric|min:0',
+            'total_loss'        => 'required|numeric|min:0',
+            'waste_date'        => 'required|date',
+            'reason'            => 'required|string|max:255',
+            'notes'             => 'nullable|string',
+        ]);
+
+        if (empty($validated['inventory_item_id']) && empty($validated['menu_id'])) {
+            return redirect()->back()->withErrors(['item' => 'Select either a raw ingredient or a menu item.']);
+        }
+
+        $validated['branch_id'] = auth()->user()->primary_branch_id ?? session('active_branch_id');
+        if (!$validated['branch_id']) {
+            $validated['branch_id'] = \App\Models\Branch::value('id');
+        }
+
+        $waste = InventoryWaste::create($validated);
+
+        $this->deductStockForWaste($waste);
+        $this->createFinanceJournalForWaste($waste);
+
+        return redirect()->back()->with('success', 'Waste event logged successfully.');
+    }
+
+    public function updateWaste(Request $request, InventoryWaste $waste)
+    {
+        $validated = $request->validate([
+            'inventory_item_id' => 'nullable|exists:inventory_items,id',
+            'menu_id'           => 'nullable|exists:menus,id',
+            'quantity'          => 'required|numeric|min:0.01',
+            'cost_per_unit'     => 'required|numeric|min:0',
+            'total_loss'        => 'required|numeric|min:0',
+            'waste_date'        => 'required|date',
+            'reason'            => 'required|string|max:255',
+            'notes'             => 'nullable|string',
+        ]);
+
+        if (empty($validated['inventory_item_id']) && empty($validated['menu_id'])) {
+            return redirect()->back()->withErrors(['item' => 'Select either a raw ingredient or a menu item.']);
+        }
+
+        $this->revertStockForWaste($waste);
+        $this->deleteFinanceJournalForWaste($waste);
+
+        $waste->update($validated);
+
+        $this->deductStockForWaste($waste);
+        $this->createFinanceJournalForWaste($waste);
+
+        return redirect()->back()->with('success', 'Waste entry updated.');
+    }
+
+    public function destroyWaste(InventoryWaste $waste)
+    {
+        $this->revertStockForWaste($waste);
+        $this->deleteFinanceJournalForWaste($waste);
+        $waste->delete();
+
+        return redirect()->back()->with('success', 'Waste record deleted and stock restored.');
+    }
+
+    protected function deductStockForWaste(InventoryWaste $waste)
+    {
+        if ($waste->inventory_item_id) {
+            InventoryUsage::create([
+                'branch_id' => $waste->branch_id,
+                'inventory_item_id' => $waste->inventory_item_id,
+                'quantity_used' => $waste->quantity,
+                'usage_date' => $waste->waste_date,
+                'notes' => "Waste Ref: {$waste->id} | Raw Material Waste: " . ($waste->notes ?? ''),
+            ]);
+
+            $item = InventoryItem::find($waste->inventory_item_id);
+            if ($item) {
+                $item->current_stock -= $waste->quantity;
+                $item->save();
+            }
+        } elseif ($waste->menu_id) {
+            $recipes = MenuRecipe::where('menu_id', $waste->menu_id)->get();
+            foreach ($recipes as $ingredient) {
+                $qtyToDeduct = $ingredient->quantity_per_serving * $waste->quantity;
+
+                $item = InventoryItem::find($ingredient->inventory_item_id);
+                if ($item) {
+                    $item->current_stock -= $qtyToDeduct;
+                    $item->save();
+                }
+
+                InventoryUsage::create([
+                    'branch_id' => $waste->branch_id,
+                    'inventory_item_id' => $ingredient->inventory_item_id,
+                    'quantity_used' => $qtyToDeduct,
+                    'usage_date' => $waste->waste_date,
+                    'notes' => "Waste Ref: {$waste->id} | Auto deduction for menu item: " . ($waste->menu ? $waste->menu->name : 'Menu Item'),
+                ]);
+            }
+        }
+    }
+
+    protected function revertStockForWaste(InventoryWaste $waste)
+    {
+        if ($waste->inventory_item_id) {
+            $item = InventoryItem::find($waste->inventory_item_id);
+            if ($item) {
+                $item->current_stock += $waste->quantity;
+                $item->save();
+            }
+        }
+
+        $usages = InventoryUsage::where('notes', 'like', "Waste Ref: {$waste->id}%")->get();
+        foreach ($usages as $usage) {
+            if ($waste->menu_id) {
+                $item = InventoryItem::find($usage->inventory_item_id);
+                if ($item) {
+                    $item->current_stock += $usage->quantity_used;
+                    $item->save();
+                }
+            }
+            $usage->delete();
+        }
+    }
+
+    protected function createFinanceJournalForWaste(InventoryWaste $waste)
+    {
+        $tenantId = auth()->user()->tenant_id ?? 1;
+
+        $wasteExpenseAccount = \App\Models\Account::firstOrCreate(
+            ['tenant_id' => $tenantId, 'code' => '5005'],
+            ['name' => 'Food Waste Expense', 'type' => 'expense', 'description' => 'Losses due to spoiled, damaged, or wasted inventory']
+        );
+        $inventoryAssetAccount = \App\Models\Account::firstOrCreate(
+            ['tenant_id' => $tenantId, 'code' => '1004'],
+            ['name' => 'Inventory Asset', 'type' => 'asset', 'description' => 'Value of inventory on hand']
+        );
+
+        if (class_exists(\App\Models\JournalEntry::class)) {
+            $journalEntry = \App\Models\JournalEntry::create([
+                'tenant_id' => $tenantId,
+                'reference_number' => 'WST-' . $waste->id,
+                'date' => $waste->waste_date,
+                'description' => 'Food Waste/Damage: ' . ($waste->inventoryItem ? $waste->inventoryItem->name : ($waste->menu ? $waste->menu->name : 'Item')),
+                'status' => 'posted',
+            ]);
+
+            $journalEntry->lines()->create([
+                'account_id' => $wasteExpenseAccount->id,
+                'debit' => $waste->total_loss,
+                'credit' => 0,
+                'description' => 'Food Waste Expense Recognition',
+            ]);
+
+            $journalEntry->lines()->create([
+                'account_id' => $inventoryAssetAccount->id,
+                'debit' => 0,
+                'credit' => $waste->total_loss,
+                'description' => 'Inventory Write-off due to Waste/Damage',
+            ]);
+        }
+    }
+
+    protected function deleteFinanceJournalForWaste(InventoryWaste $waste)
+    {
+        if (class_exists(\App\Models\JournalEntry::class)) {
+            \App\Models\JournalEntry::where('reference_number', 'WST-' . $waste->id)->delete();
+        }
     }
 }
