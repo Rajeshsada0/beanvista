@@ -810,7 +810,7 @@ export default function MenuIndex({ menus, db_categories = [] }) {
                         setData(gallery.type === 'images' ? 'image' : 'icon', selection);
                         setPreviews({
                             ...previews,
-                            [gallery.type === 'images' ? 'image' : 'icon']: `/storage/${selection}`
+                            [gallery.type === 'images' ? 'image' : 'icon']: `/img/${selection}`
                         });
                     } else {
                         // New file object
