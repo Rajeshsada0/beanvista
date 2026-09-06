@@ -56,7 +56,7 @@ export default function Banking({ auth, accounts, transactions }) {
 
     const openEdit = (account) => {
         setEditingBank(account);
-        setQrPreview(account.qr_code_url || null);
+        setQrPreview(account.qr_code_url ? account.qr_code_url.replace('/storage/', '/img/') : null);
         setData({
             account_name: account.account_name,
             bank_name: account.bank_name || '',
@@ -314,6 +314,11 @@ export default function Banking({ auth, accounts, transactions }) {
                                         <img 
                                             src={qrPreview} 
                                             alt="QR Preview" 
+                                            onError={(e) => {
+                                                if (e.target.src && e.target.src.includes('/storage/')) {
+                                                    e.target.src = e.target.src.replace('/storage/', '/img/');
+                                                }
+                                            }}
                                             className="w-16 h-16 object-contain rounded-lg bg-white border border-slate-200 p-1 shadow-sm"
                                         />
                                         <div>
@@ -398,8 +403,13 @@ export default function Banking({ auth, accounts, transactions }) {
 
                         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 inline-block mb-4 shadow-inner">
                             <img 
-                                src={previewQrModal.account.qr_code_url} 
+                                src={previewQrModal.account.qr_code_url ? previewQrModal.account.qr_code_url.replace('/storage/', '/img/') : ''} 
                                 alt="Payment QR" 
+                                onError={(e) => {
+                                    if (e.target.src && e.target.src.includes('/storage/')) {
+                                        e.target.src = e.target.src.replace('/storage/', '/img/');
+                                    }
+                                }}
                                 className="w-64 h-64 object-contain rounded-xl bg-white p-2 border border-slate-100 shadow-sm mx-auto"
                             />
                         </div>

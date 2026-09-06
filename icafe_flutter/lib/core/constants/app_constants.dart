@@ -9,13 +9,20 @@ class AppConstants {
   static String formatImageUrl(String? url) {
     if (url == null || url.isEmpty) return '';
     if (url.contains('127.0.0.1:8000')) {
-      return url.replaceAll('http://127.0.0.1:8000', baseUrl);
+      url = url.replaceAll('http://127.0.0.1:8000', baseUrl);
     }
     if (url.contains('localhost:8000')) {
-      return url.replaceAll('http://localhost:8000', baseUrl);
+      url = url.replaceAll('http://localhost:8000', baseUrl);
     }
     if (!url.startsWith('http')) {
-      return '$baseUrl/$url';
+      final clean = url.startsWith('/') ? url.substring(1) : url;
+      if (clean.startsWith('storage/')) {
+        return '$baseUrl/img/${clean.replaceFirst('storage/', '')}';
+      }
+      return '$baseUrl/img/$clean';
+    }
+    if (url.contains('/storage/')) {
+      return url.replaceFirst('/storage/', '/img/');
     }
     return url;
   }

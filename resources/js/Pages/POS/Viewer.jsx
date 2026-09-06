@@ -1281,8 +1281,13 @@ export default function Viewer({ menus = [], categories = [], tables = [], addon
                         
                         <div className="p-3 bg-white border-2 border-dashed border-brand-200 rounded-2xl inline-block shadow-inner mb-3">
                             <img 
-                                src={viewingQrAccount.qr_code_url} 
+                                src={viewingQrAccount.qr_code_url ? viewingQrAccount.qr_code_url.replace('/storage/', '/img/') : ''} 
                                 alt="Payment QR" 
+                                onError={(e) => {
+                                    if (e.target.src && e.target.src.includes('/storage/')) {
+                                        e.target.src = e.target.src.replace('/storage/', '/img/');
+                                    }
+                                }}
                                 className="w-56 h-56 object-contain rounded-xl"
                             />
                         </div>

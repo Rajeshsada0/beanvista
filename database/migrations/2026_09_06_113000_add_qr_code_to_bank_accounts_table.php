@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('bank_accounts', function (Blueprint $table) {
-            $table->string('qr_code')->nullable()->after('account_type');
-        });
+        if (!Schema::hasColumn('bank_accounts', 'qr_code')) {
+            Schema::table('bank_accounts', function (Blueprint $table) {
+                $table->string('qr_code')->nullable()->after('account_type');
+            });
+        }
     }
 
     /**
@@ -21,8 +23,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('bank_accounts', function (Blueprint $table) {
-            $table->dropColumn('qr_code');
-        });
+        if (Schema::hasColumn('bank_accounts', 'qr_code')) {
+            Schema::table('bank_accounts', function (Blueprint $table) {
+                $table->dropColumn('qr_code');
+            });
+        }
     }
 };

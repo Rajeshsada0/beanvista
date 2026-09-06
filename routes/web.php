@@ -28,6 +28,31 @@ Route::get('/img/{path}', function (string $path) {
         ->header('Access-Control-Allow-Origin', '*');
 })->where('path', '.*')->name('media.serve');
 
+/**
+ * Fallback storage route — serves files from the public disk if requested via /storage/
+ * directly when symbolic links are disabled or missing on production hosting.
+ */
+Route::get('/storage/{path}', function (string $path) {
+    $path = rawurldecode($path);
+    $path = ltrim(str_replace(['..', '\\'], ['', '/'], $path), '/');
+
+    if (str_starts_with($path, 'app/public/')) {
+        $path = substr($path, strlen('app/public/'));
+    }
+
+    if (!Storage::disk('public')->exists($path)) {
+        abort(404);
+    }
+
+    $content = Storage::disk('public')->get($path);
+    $mime    = Storage::disk('public')->mimeType($path) ?: 'application/octet-stream';
+
+    return response($content, 200)
+        ->header('Content-Type', $mime)
+        ->header('Cache-Control', 'public, max-age=86400')
+        ->header('Access-Control-Allow-Origin', '*');
+})->where('path', '.*')->name('storage.serve');
+
 Route::get('/', [\App\Http\Controllers\FrontEndController::class, 'home'])->name('home');
 Route::get('/about', [\App\Http\Controllers\FrontEndController::class, 'about'])->name('about');
 Route::get('/contact', [\App\Http\Controllers\FrontEndController::class, 'contact'])->name('contact');
@@ -113,6 +138,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         
         Route::get('support', [\App\Http\Controllers\SupportTicketController::class, 'index'])->name('support.index');
         Route::post('support', [\App\Http\Controllers\SupportTicketController::class, 'store'])->name('support.store');
+
+        Route::get('/run-migrations', function () {
+            \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Migrations executed successfully',
+                'output' => \Illuminate\Support\Facades\Artisan::output(),
+            ]);
+        })->name('admin.run-migrations');
         Route::get('support/{ticket}', [\App\Http\Controllers\SupportTicketController::class, 'show'])->name('support.show');
         Route::post('support/{ticket}/reply', [\App\Http\Controllers\SupportTicketController::class, 'reply'])->name('support.reply');
         Route::patch('support/{ticket}/status', [\App\Http\Controllers\SupportTicketController::class, 'updateStatus'])->name('support.status');

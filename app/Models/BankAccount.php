@@ -28,17 +28,37 @@ class BankAccount extends Model
         'qr_code_url',
     ];
 
+    protected static function booted()
+    {
+        static::saving(function ($account) {
+            if (isset($account->attributes['qr_code']) && !\Illuminate\Support\Facades\Schema::hasColumn('bank_accounts', 'qr_code')) {
+                try {
+                    \Illuminate\Support\Facades\Schema::table('bank_accounts', function (\Illuminate\Database\Schema\Blueprint $table) {
+                        $table->string('qr_code')->nullable()->after('account_type');
+                    });
+                } catch (\Throwable $e) {
+                    unset($account->attributes['qr_code']);
+                }
+            }
+        });
+    }
+
     public function getQrCodeUrlAttribute()
     {
-        if (!$this->qr_code) {
+        $qrCode = $this->attributes['qr_code'] ?? null;
+        if (!$qrCode) {
             return null;
         }
 
-        if (str_starts_with($this->qr_code, 'http')) {
-            return $this->qr_code;
+        if (str_starts_with($qrCode, 'http')) {
+            if (str_contains($qrCode, '/storage/')) {
+                return str_replace('/storage/', '/img/', $qrCode);
+            }
+            return $qrCode;
         }
 
-        return rtrim(config('app.url'), '/') . '/storage/' . ltrim($this->qr_code, '/');
+        $cleanPath = ltrim(str_replace('app/public/', '', $qrCode), '/');
+        return url('/img/' . $cleanPath);
     }
 
     public function glAccount()

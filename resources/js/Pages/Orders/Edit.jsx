@@ -1123,7 +1123,7 @@ export default function EditOrder({ order, menus, table, customers, categories, 
                                                     <option value="">Select an account</option>
                                                     {bankAccounts?.map(acc => (
                                                         <option key={acc.id} value={acc.id}>
-                                                            {acc.account_name} ({acc.bank_name}) - {currency}{acc.balance}
+                                                            {acc.account_name}{acc.bank_name ? ` (${acc.bank_name})` : ''}
                                                         </option>
                                                     ))}
                                                 </select>
@@ -1144,7 +1144,7 @@ export default function EditOrder({ order, menus, table, customers, categories, 
                                             <option value="">Select an account</option>
                                             {bankAccounts?.map(acc => (
                                                 <option key={acc.id} value={acc.id}>
-                                                    {acc.account_name} ({acc.bank_name}) - {currency}{acc.balance}
+                                                    {acc.account_name}{acc.bank_name ? ` (${acc.bank_name})` : ''}
                                                 </option>
                                             ))}
                                         </select>
@@ -1166,8 +1166,13 @@ export default function EditOrder({ order, menus, table, customers, categories, 
                                                 </div>
                                                 <div className="p-2.5 bg-white rounded-2xl border-2 border-dashed border-brand-200 shadow-inner">
                                                     <img 
-                                                         src={selectedAccount.qr_code_url} 
+                                                         src={selectedAccount.qr_code_url ? selectedAccount.qr_code_url.replace('/storage/', '/img/') : ''} 
                                                          alt="Payment QR Code" 
+                                                         onError={(e) => {
+                                                             if (e.target.src && e.target.src.includes('/storage/')) {
+                                                                 e.target.src = e.target.src.replace('/storage/', '/img/');
+                                                             }
+                                                         }}
                                                          className="w-48 h-48 object-contain rounded-xl"
                                                     />
                                                 </div>

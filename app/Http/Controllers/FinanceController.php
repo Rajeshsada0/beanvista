@@ -52,6 +52,15 @@ class FinanceController extends Controller
 
     public function banking(Request $request)
     {
+        // Auto-heal schema if qr_code column has not been migrated yet
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('bank_accounts', 'qr_code')) {
+            try {
+                \Illuminate\Support\Facades\Schema::table('bank_accounts', function (\Illuminate\Database\Schema\Blueprint $table) {
+                    $table->string('qr_code')->nullable()->after('account_type');
+                });
+            } catch (\Throwable $e) {}
+        }
+
         $tenantId = auth()->user()->tenant_id ?? 1;
         \App\Http\Controllers\ApiController::syncAllPendingOrderBanking($tenantId);
 
@@ -94,16 +103,29 @@ class FinanceController extends Controller
             'description' => 'Bank account for ' . ($validated['bank_name'] ?? '')
         ]);
 
-        BankAccount::create([
+        $accountData = [
             'tenant_id' => $tenantId,
             'account_name' => $validated['account_name'],
             'account_number' => $validated['account_number'],
             'bank_name' => $validated['bank_name'],
             'account_type' => $validated['account_type'],
-            'qr_code' => $qrPath,
             'gl_account_id' => $glAccount->id,
             'balance' => $validated['balance'],
-        ]);
+        ];
+
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('bank_accounts', 'qr_code')) {
+            try {
+                \Illuminate\Support\Facades\Schema::table('bank_accounts', function (\Illuminate\Database\Schema\Blueprint $table) {
+                    $table->string('qr_code')->nullable()->after('account_type');
+                });
+            } catch (\Throwable $e) {}
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('bank_accounts', 'qr_code')) {
+            $accountData['qr_code'] = $qrPath;
+        }
+
+        BankAccount::create($accountData);
 
         return back()->with('success', 'Bank account added successfully.');
     }
@@ -132,9 +154,24 @@ class FinanceController extends Controller
                 \Illuminate\Support\Facades\Storage::disk('public')->delete($account->qr_code);
             }
             $validated['qr_code'] = null;
+        } else {
+            unset($validated['qr_code']);
         }
 
         unset($validated['remove_qr']);
+
+        if (array_key_exists('qr_code', $validated)) {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('bank_accounts', 'qr_code')) {
+                try {
+                    \Illuminate\Support\Facades\Schema::table('bank_accounts', function (\Illuminate\Database\Schema\Blueprint $table) {
+                        $table->string('qr_code')->nullable()->after('account_type');
+                    });
+                } catch (\Throwable $e) {
+                    unset($validated['qr_code']);
+                }
+            }
+        }
+
         $account->update($validated);
         
         if ($account->glAccount) {

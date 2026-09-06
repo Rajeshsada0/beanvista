@@ -23,9 +23,14 @@ class PaymentMethod extends Model
     public function getQrCodeUrlAttribute()
     {
         if (!$this->qr_code) return null;
-        // Build correct public URL: APP_URL/storage/<path>
-        // Do NOT use Storage::disk('public')->url() as it may produce wrong path on some servers
-        return rtrim(config('app.url'), '/') . '/storage/' . ltrim($this->qr_code, '/');
+        if (str_starts_with($this->qr_code, 'http')) {
+            if (str_contains($this->qr_code, '/storage/')) {
+                return str_replace('/storage/', '/img/', $this->qr_code);
+            }
+            return $this->qr_code;
+        }
+        $cleanPath = ltrim(str_replace('app/public/', '', $this->qr_code), '/');
+        return url('/img/' . $cleanPath);
     }
 
     public function paymentRequests()
