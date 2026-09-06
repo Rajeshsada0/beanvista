@@ -2,6 +2,7 @@ import 'package:icafe_app/core/utils/snackbar_helper.dart';
 import 'package:icafe_app/core/constants/app_constants.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../providers/orders_provider.dart';
 import '../providers/finance_provider.dart';
@@ -352,7 +353,7 @@ class _PaymentModalState extends State<PaymentModal>
         ),
         const SizedBox(height: 4),
         SizedBox(
-          height: 210,
+          height: _tabCtrl.index == 1 ? 380 : 220,
           child: TabBarView(
             controller: _tabCtrl,
             children: [_buildCashTab(), _buildCardTab(), _buildCreditTab()],
@@ -466,6 +467,7 @@ class _PaymentModalState extends State<PaymentModal>
     final bankCtrl = TextEditingController();
     final balanceCtrl = TextEditingController(text: '0');
     String type = 'checking';
+    XFile? pickedQrFile;
 
     showModalBottomSheet(
       context: context,
@@ -475,113 +477,159 @@ class _PaymentModalState extends State<PaymentModal>
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setStateSheet) => Padding(
           padding: EdgeInsets.only(left: 24, right: 24, top: 24, bottom: MediaQuery.of(ctx2).viewInsets.bottom + 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Register Bank Account', style: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 16),
-              TextField(
-                controller: nameCtrl,
-                style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 13),
-                decoration: InputDecoration(
-                  labelText: 'Account Name (e.g. Primary Checking)',
-                  labelStyle: GoogleFonts.poppins(color: AppColors.textMuted, fontSize: 12),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Register Bank Account', style: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameCtrl,
+                  style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: 'Account Name (e.g. Primary Checking)',
+                    labelStyle: GoogleFonts.poppins(color: AppColors.textMuted, fontSize: 12),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: numberCtrl,
-                style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 13),
-                decoration: InputDecoration(
-                  labelText: 'Account Number (optional)',
-                  labelStyle: GoogleFonts.poppins(color: AppColors.textMuted, fontSize: 12),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: numberCtrl,
+                  style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: 'Account Number (optional)',
+                    labelStyle: GoogleFonts.poppins(color: AppColors.textMuted, fontSize: 12),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: bankCtrl,
-                style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 13),
-                decoration: InputDecoration(
-                  labelText: 'Bank Name (e.g. Standard Chartered)',
-                  labelStyle: GoogleFonts.poppins(color: AppColors.textMuted, fontSize: 12),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: bankCtrl,
+                  style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: 'Bank Name (e.g. Standard Chartered)',
+                    labelStyle: GoogleFonts.poppins(color: AppColors.textMuted, fontSize: 12),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: type,
-                dropdownColor: AppColors.darkCard,
-                borderRadius: BorderRadius.circular(12),
-                style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 13),
-                decoration: InputDecoration(
-                  labelText: 'Account Type',
-                  filled: true,
-                  fillColor: AppColors.darkSurface,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                items: ['checking', 'cash', 'online']
-                    .map((t) => DropdownMenuItem(value: t, child: Text(t.toUpperCase(), style: GoogleFonts.poppins(color: AppColors.textPrimary))))
-                    .toList(),
-                onChanged: (v) {
-                  if (v != null) {
-                    setStateSheet(() {
-                      type = v;
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: balanceCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 13),
-                decoration: InputDecoration(
-                  labelText: 'Starting Balance (Rs.)',
-                  labelStyle: GoogleFonts.poppins(color: AppColors.textMuted, fontSize: 12),
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final bal = double.tryParse(balanceCtrl.text) ?? 0.0;
-                    if (nameCtrl.text.trim().isEmpty || bal < 0) {
-                      showTopSnackBar(context, SnackBar(content: const Text('Please fill all required fields'), backgroundColor: AppColors.statusRed));
-                      return;
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: type,
+                  dropdownColor: AppColors.darkCard,
+                  borderRadius: BorderRadius.circular(12),
+                  style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: 'Account Type',
+                    filled: true,
+                    fillColor: AppColors.darkSurface,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  items: ['checking', 'cash', 'online']
+                      .map((t) => DropdownMenuItem(value: t, child: Text(t.toUpperCase(), style: GoogleFonts.poppins(color: AppColors.textPrimary))))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) {
+                      setStateSheet(() {
+                        type = v;
+                      });
                     }
-
-                    final financeProvider = Provider.of<FinanceProvider>(context, listen: false);
-                    final ordersProvider = Provider.of<OrdersProvider>(context, listen: false);
-
-                    final success = await financeProvider.createBankAccount({
-                      'account_name': nameCtrl.text.trim(),
-                      'account_number': numberCtrl.text.trim(),
-                      'bank_name': bankCtrl.text.trim(),
-                      'account_type': type,
-                      'balance': bal,
-                    });
-
-                    if (success) {
-                      await ordersProvider.fetchBankAccounts();
-                      // Auto-select the newly created account
-                      final newAcc = ordersProvider.bankAccounts.firstWhere(
-                        (acc) => acc.name == nameCtrl.text.trim() && acc.number == numberCtrl.text.trim(),
-                        orElse: () => ordersProvider.bankAccounts.isNotEmpty
-                            ? ordersProvider.bankAccounts.last
-                            : BankAccountItem(id: 0, name: '', number: '', bankName: '', type: '', balance: 0.0),
-                      );
-                      if (newAcc.id != 0) {
-                        setState(() {
-                          _selectedBankAccountId = newAcc.id;
-                        });
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: balanceCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: 'Starting Balance (Rs.)',
+                    labelStyle: GoogleFonts.poppins(color: AppColors.textMuted, fontSize: 12),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: () async {
+                    final picker = ImagePicker();
+                    final picked = await picker.pickImage(source: ImageSource.gallery);
+                    if (picked != null) {
+                      setStateSheet(() => pickedQrFile = picked);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.darkSurface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: pickedQrFile != null ? AppColors.accentAmber : AppColors.darkBorder,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          pickedQrFile != null ? Icons.check_circle : Icons.qr_code_2,
+                          color: pickedQrFile != null ? AppColors.accentAmber : AppColors.textMuted,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            pickedQrFile != null ? 'QR Code: ${pickedQrFile!.name}' : 'Upload Payment QR Code (Optional)',
+                            style: GoogleFonts.poppins(
+                              color: pickedQrFile != null ? AppColors.textPrimary : AppColors.textMuted,
+                              fontSize: 12,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (pickedQrFile != null)
+                          GestureDetector(
+                            onTap: () => setStateSheet(() => pickedQrFile = null),
+                            child: Icon(Icons.close, size: 18, color: AppColors.textMuted),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final bal = double.tryParse(balanceCtrl.text) ?? 0.0;
+                      if (nameCtrl.text.trim().isEmpty || bal < 0) {
+                        showTopSnackBar(context, SnackBar(content: const Text('Please fill all required fields'), backgroundColor: AppColors.statusRed));
+                        return;
                       }
-                      if (ctx.mounted) {
-                        Navigator.pop(ctx);
-                        showTopSnackBar(context, SnackBar(content: const Text('Bank Account registered successfully'), backgroundColor: AppColors.statusGreen));
-                      }
-                    } else {
+
+                      final financeProvider = Provider.of<FinanceProvider>(context, listen: false);
+                      final ordersProvider = Provider.of<OrdersProvider>(context, listen: false);
+
+                      final success = await financeProvider.createBankAccount({
+                        'account_name': nameCtrl.text.trim(),
+                        'account_number': numberCtrl.text.trim(),
+                        'bank_name': bankCtrl.text.trim(),
+                        'account_type': type,
+                        'balance': bal,
+                      }, qrImage: pickedQrFile);
+
+                      if (success) {
+                        await ordersProvider.fetchBankAccounts();
+                        // Auto-select the newly created account
+                        final newAcc = ordersProvider.bankAccounts.firstWhere(
+                          (acc) => acc.name == nameCtrl.text.trim() && acc.number == numberCtrl.text.trim(),
+                          orElse: () => ordersProvider.bankAccounts.isNotEmpty
+                              ? ordersProvider.bankAccounts.last
+                              : BankAccountItem(id: 0, name: '', number: '', bankName: '', type: '', balance: 0.0),
+                        );
+                        if (newAcc.id != 0) {
+                          setState(() {
+                            _selectedBankAccountId = newAcc.id;
+                          });
+                        }
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                          showTopSnackBar(context, SnackBar(content: const Text('Bank Account registered successfully'), backgroundColor: AppColors.statusGreen));
+                        }
+                      } else {
                       showTopSnackBar(context, SnackBar(content: Text(financeProvider.error ?? 'Failed to register account'), backgroundColor: AppColors.statusRed));
                     }
                   },
@@ -600,13 +648,93 @@ class _PaymentModalState extends State<PaymentModal>
     );
   }
 
+  void _showFullQrDialog(BankAccountItem account) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Scan to Pay',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.grey),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.network(
+                  account.fullQrCodeUrl!,
+                  width: 260,
+                  height: 260,
+                  fit: BoxFit.contain,
+                  errorBuilder: (c, e, s) => Container(
+                    width: 260,
+                    height: 260,
+                    color: Colors.grey.shade100,
+                    child: const Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Rs. ${widget.grandTotal.toStringAsFixed(2)}',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 22,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              Text(
+                '${account.name} • ${account.bankName}',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+              if (account.number.isNotEmpty)
+                Text(
+                  'A/C: ${account.number}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: const Color(0xFF94A3B8),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildCardTab() {
     final bankAccounts = Provider.of<OrdersProvider>(context, listen: true).bankAccounts;
     if (_selectedBankAccountId == null && bankAccounts.isNotEmpty) {
-      _selectedBankAccountId = bankAccounts.first.id;
+      final preferred = bankAccounts.where((acc) => acc.type == 'online').firstOrNull;
+      _selectedBankAccountId = preferred?.id ?? bankAccounts.first.id;
     }
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+    final selectedAcc = bankAccounts.where((acc) => acc.id == _selectedBankAccountId).firstOrNull;
+
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -639,6 +767,138 @@ class _PaymentModalState extends State<PaymentModal>
             )).toList(),
             onChanged: (val) => setState(() => _selectedBankAccountId = val),
           ),
+          if (selectedAcc != null) ...[
+            const SizedBox(height: 12),
+            if (selectedAcc.fullQrCodeUrl != null)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.qr_code_2, size: 20, color: Color(0xFF1E293B)),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Scan to Pay',
+                          style: GoogleFonts.poppins(
+                            color: const Color(0xFF1E293B),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    GestureDetector(
+                      onTap: () => _showFullQrDialog(selectedAcc),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300, width: 1.5),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            selectedAcc.fullQrCodeUrl!,
+                            width: 170,
+                            height: 170,
+                            fit: BoxFit.contain,
+                            errorBuilder: (ctx, _, __) => Container(
+                              width: 170,
+                              height: 170,
+                              color: Colors.grey.shade100,
+                              child: const Icon(Icons.broken_image, color: Colors.grey, size: 40),
+                            ),
+                            loadingBuilder: (ctx, child, progress) {
+                              if (progress == null) return child;
+                              return Container(
+                                width: 170,
+                                height: 170,
+                                alignment: Alignment.center,
+                                child: const CircularProgressIndicator(strokeWidth: 2),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Rs. ${widget.grandTotal.toStringAsFixed(2)}',
+                      style: GoogleFonts.poppins(
+                        color: const Color(0xFF0F172A),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      '${selectedAcc.name} (${selectedAcc.bankName})',
+                      style: GoogleFonts.poppins(
+                        color: const Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                        fontSize: 11,
+                      ),
+                    ),
+                    if (selectedAcc.number.isNotEmpty)
+                      Text(
+                        'A/C: ${selectedAcc.number}',
+                        style: GoogleFonts.poppins(
+                          color: const Color(0xFF94A3B8),
+                          fontWeight: FontWeight.w500,
+                          fontSize: 10,
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tap QR code to zoom in',
+                      style: GoogleFonts.poppins(
+                        color: const Color(0xFF94A3B8),
+                        fontStyle: FontStyle.italic,
+                        fontSize: 9,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.accentAmber.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.accentAmber.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: AppColors.accentAmber),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'No payment QR code configured for this account',
+                        style: GoogleFonts.poppins(color: AppColors.accentAmber, fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ],
       ),
     );

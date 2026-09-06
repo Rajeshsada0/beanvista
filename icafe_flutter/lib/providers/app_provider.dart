@@ -17,6 +17,7 @@ class AppProvider extends ChangeNotifier {
   int _kdsWarningMins = 10;
   int _kdsCriticalMins = 20;
   bool _enableGuestQr = false;
+  bool _enableCompletedOrderEdit = false;
   String _address = '';
   String _contactPhone = '';
   String _contactEmail = '';
@@ -51,6 +52,7 @@ class AppProvider extends ChangeNotifier {
   int get kdsWarningMins => _kdsWarningMins;
   int get kdsCriticalMins => _kdsCriticalMins;
   bool get enableGuestQr => _enableGuestQr;
+  bool get enableCompletedOrderEdit => _enableCompletedOrderEdit;
   String get address => _address;
   String get contactPhone => _contactPhone;
   String get contactEmail => _contactEmail;
@@ -127,6 +129,7 @@ class AppProvider extends ChangeNotifier {
       _kdsWarningMins = prefs.getInt('pref_kds_warning_mins') ?? 10;
       _kdsCriticalMins = prefs.getInt('pref_kds_critical_mins') ?? 20;
       _enableGuestQr = prefs.getBool('pref_enable_guest_qr') ?? false;
+      _enableCompletedOrderEdit = prefs.getBool('pref_enable_completed_order_edit') ?? false;
       _address = prefs.getString('pref_address') ?? '';
       _contactPhone = prefs.getString('pref_contact_phone') ?? '';
       _contactEmail = prefs.getString('pref_contact_email') ?? '';
@@ -159,6 +162,7 @@ class AppProvider extends ChangeNotifier {
         prefs.setInt('pref_kds_warning_mins', _kdsWarningMins),
         prefs.setInt('pref_kds_critical_mins', _kdsCriticalMins),
         prefs.setBool('pref_enable_guest_qr', _enableGuestQr),
+        prefs.setBool('pref_enable_completed_order_edit', _enableCompletedOrderEdit),
         prefs.setString('pref_address', _address),
         prefs.setString('pref_contact_phone', _contactPhone),
         prefs.setString('pref_contact_email', _contactEmail),
@@ -195,6 +199,7 @@ class AppProvider extends ChangeNotifier {
     _kdsWarningMins = 10;
     _kdsCriticalMins = 20;
     _enableGuestQr = false;
+    _enableCompletedOrderEdit = false;
     _address = '';
     _contactPhone = '';
     _contactEmail = '';
@@ -227,6 +232,7 @@ class AppProvider extends ChangeNotifier {
         _kdsWarningMins = int.tryParse(data['kds_warning_mins']?.toString() ?? '') ?? 10;
         _kdsCriticalMins = int.tryParse(data['kds_critical_mins']?.toString() ?? '') ?? 20;
         _enableGuestQr = data['enable_guest_qr']?.toString() == 'true' || data['enable_guest_qr']?.toString() == '1';
+        _enableCompletedOrderEdit = data['enable_completed_order_edit']?.toString() == 'true' || data['enable_completed_order_edit']?.toString() == '1';
         _address = data['address'] as String? ?? '';
         _contactPhone = data['contact_phone'] as String? ?? '';
         _contactEmail = data['contact_email'] as String? ?? '';

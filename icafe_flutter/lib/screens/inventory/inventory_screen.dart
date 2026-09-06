@@ -23,7 +23,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<InventoryProvider>().fetchInventory();
       if (widget.showAdd) {
@@ -110,6 +110,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             Tab(text: 'Items'),
             Tab(text: 'Purchases'),
             Tab(text: 'Usages'),
+            Tab(text: 'Wastes'),
             Tab(text: 'Recipes'),
             Tab(text: 'Suppliers'),
             Tab(text: 'Settings'),
@@ -124,6 +125,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                 _buildItemsTab(provider.items),
                 _buildPurchasesTab(provider.purchases),
                 _buildUsagesTab(provider.usages),
+                _buildWastesTab(provider.wastes),
                 _buildRecipesTab(),
                 _buildSuppliersTab(provider.suppliers),
                 _buildSettingsTab(),
@@ -403,6 +405,140 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
+  Widget _buildWastesTab(List<Map<String, dynamic>> wastes) {
+    if (wastes.isEmpty) {
+      return Center(
+        child: Text('No waste or damage events logged',
+            style: GoogleFonts.poppins(color: AppColors.textMuted)),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 100),
+      itemCount: wastes.length,
+      itemBuilder: (ctx, i) {
+        final w = wastes[i];
+        final isRaw = w['type'] == 'raw';
+        
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.darkCard,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.darkBorder),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.statusRedBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.delete_outline_rounded,
+                    color: AppColors.statusRed, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      w['item_name'] ?? 'Unknown Item',
+                      style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Qty: ${w['qty']} ${w['unit']}',
+                      style: GoogleFonts.poppins(
+                          fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: isRaw ? Colors.blue.withOpacity(0.1) : Colors.purple.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            isRaw ? 'RAW INGREDIENT' : 'MENU ITEM',
+                            style: GoogleFonts.poppins(
+                              fontSize: 9, 
+                              fontWeight: FontWeight.w600,
+                              color: isRaw ? Colors.blue : Colors.purple,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: AppColors.statusAmberBg,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            w['reason'] ?? 'Wasted',
+                            style: GoogleFonts.poppins(
+                              fontSize: 9, 
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.statusAmber,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'Rs. ${w['total_loss']}',
+                    style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.statusRed),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    w['date'] ?? '',
+                    style: GoogleFonts.poppins(
+                        fontSize: 11, color: AppColors.textMuted),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, size: 16, color: Colors.blue),
+                        constraints: const BoxConstraints(),
+                        padding: EdgeInsets.zero,
+                        onPressed: () => _showEditWasteSheet(w),
+                      ),
+                      const SizedBox(width: 10),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                        constraints: const BoxConstraints(),
+                        padding: EdgeInsets.zero,
+                        onPressed: () => _confirmDeleteWaste(w),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildSuppliersTab(List<Map<String, dynamic>> suppliers) {
     if (suppliers.isEmpty) {
       return Center(
@@ -529,6 +665,49 @@ class _InventoryScreenState extends State<InventoryScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _AddInventorySheet(itemToEdit: item),
+    );
+  }
+
+  void _showEditWasteSheet(Map<String, dynamic> waste) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _AddInventorySheet(wasteToEdit: waste),
+    );
+  }
+
+  void _confirmDeleteWaste(Map<String, dynamic> waste) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.darkCard,
+        title: Text('Delete Waste Record', style: GoogleFonts.poppins(color: AppColors.textPrimary)),
+        content: Text('Are you sure you want to delete this waste record? This will restore stock level.',
+            style: GoogleFonts.poppins(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(
+            child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textMuted)),
+            onPressed: () => Navigator.pop(ctx),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.statusRed),
+            child: Text('Delete', style: GoogleFonts.poppins(color: Colors.white)),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final success = await context.read<InventoryProvider>().deleteWaste(JsonUtils.parseInt(waste['id']));
+              if (mounted) {
+                showTopSnackBar(context, 
+                  SnackBar(
+                    content: Text(success ? 'Waste record deleted' : 'Failed to delete waste record'),
+                    backgroundColor: success ? AppColors.statusGreen : AppColors.statusRed,
+                  ),
+                );
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -1067,8 +1246,9 @@ class _InventoryScreenState extends State<InventoryScreen>
 class _AddInventorySheet extends StatefulWidget {
   final Map<String, dynamic>? itemToEdit;
   final Map<String, dynamic>? supplierToEdit;
+  final Map<String, dynamic>? wasteToEdit;
   
-  const _AddInventorySheet({this.itemToEdit, this.supplierToEdit});
+  const _AddInventorySheet({this.itemToEdit, this.supplierToEdit, this.wasteToEdit});
 
   @override
   State<_AddInventorySheet> createState() => _AddInventorySheetState();
@@ -1076,7 +1256,18 @@ class _AddInventorySheet extends StatefulWidget {
 
 class _AddInventorySheetState extends State<_AddInventorySheet> {
   final _formKey = GlobalKey<FormState>();
-  String _activeType = 'item'; // 'item', 'purchase', 'usage', 'supplier'
+  String _activeType = 'item'; // 'item', 'purchase', 'usage', 'supplier', 'waste'
+  
+  // Waste fields
+  String _wasteItemType = 'raw'; // 'raw' or 'menu'
+  int? _wasteIngredientId;
+  int? _wasteMenuId;
+  final _wasteQtyController = TextEditingController();
+  final _wasteCostController = TextEditingController();
+  final _wasteTotalController = TextEditingController();
+  DateTime _wasteDate = DateTime.now();
+  String _selectedReason = 'Spoiled / Rotten';
+  final _wasteNotesController = TextEditingController();
   
   // Item fields
   final _itemNameController = TextEditingController();
@@ -1128,6 +1319,38 @@ class _AddInventorySheetState extends State<_AddInventorySheet> {
       _supplierPhoneController.text = s['phone'] ?? '';
       _supplierEmailController.text = s['email'] ?? '';
       _supplierAddressController.text = s['address'] ?? '';
+    } else if (widget.wasteToEdit != null) {
+      _activeType = 'waste';
+      final w = widget.wasteToEdit!;
+      _wasteItemType = w['type'] ?? 'raw';
+      _wasteIngredientId = JsonUtils.parseIntNullable(w['inventory_item_id']);
+      _wasteMenuId = JsonUtils.parseIntNullable(w['menu_id']);
+      _wasteQtyController.text = (w['qty'] ?? '').toString();
+      _wasteCostController.text = (w['cost_per_unit'] ?? '').toString();
+      _wasteTotalController.text = (w['total_loss'] ?? '').toString();
+      _selectedReason = w['reason'] ?? 'Spoiled / Rotten';
+      _wasteNotesController.text = w['notes'] ?? '';
+      
+      if (w['date'] != null) {
+        try {
+          final parts = w['date'].split(', ');
+          if (parts.length == 2) {
+            final monthDay = parts[0].split(' ');
+            final year = int.parse(parts[1]);
+            final day = int.parse(monthDay[1]);
+            final monthStr = monthDay[0].toLowerCase();
+            int month = 1;
+            const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+            for (var m = 0; m < months.length; m++) {
+              if (monthStr.startsWith(months[m])) {
+                month = m + 1;
+                break;
+              }
+            }
+            _wasteDate = DateTime(year, month, day);
+          }
+        } catch (_) {}
+      }
     }
   }
 
@@ -1147,6 +1370,10 @@ class _AddInventorySheetState extends State<_AddInventorySheet> {
     _supplierPhoneController.dispose();
     _supplierEmailController.dispose();
     _supplierAddressController.dispose();
+    _wasteQtyController.dispose();
+    _wasteCostController.dispose();
+    _wasteTotalController.dispose();
+    _wasteNotesController.dispose();
     super.dispose();
   }
 
@@ -1160,19 +1387,36 @@ class _AddInventorySheetState extends State<_AddInventorySheet> {
     }
   }
 
-  Future<void> _selectDate(BuildContext context, bool isPurchase) async {
+  void _calculateWasteTotal() {
+    final qty = double.tryParse(_wasteQtyController.text) ?? 0;
+    final cost = double.tryParse(_wasteCostController.text) ?? 0;
+    if (qty > 0 && cost > 0) {
+      setState(() {
+        _wasteTotalController.text = (qty * cost).toStringAsFixed(2);
+      });
+    }
+  }
+
+  Future<void> _selectDate(BuildContext context, dynamic dateKey) async {
+    DateTime initial = DateTime.now();
+    if (dateKey == true || dateKey == 'purchase') initial = _purchaseDate;
+    else if (dateKey == false || dateKey == 'usage') initial = _usageDate;
+    else if (dateKey == 'waste') initial = _wasteDate;
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: isPurchase ? _purchaseDate : _usageDate,
+      initialDate: initial,
       firstDate: DateTime(2025),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     if (picked != null) {
       setState(() {
-        if (isPurchase) {
+        if (dateKey == true || dateKey == 'purchase') {
           _purchaseDate = picked;
-        } else {
+        } else if (dateKey == false || dateKey == 'usage') {
           _usageDate = picked;
+        } else if (dateKey == 'waste') {
+          _wasteDate = picked;
         }
       });
     }
@@ -1244,6 +1488,38 @@ class _AddInventorySheetState extends State<_AddInventorySheet> {
           address: _supplierAddressController.text.trim(),
         );
       }
+    } else if (_activeType == 'waste') {
+      final qty = double.tryParse(_wasteQtyController.text) ?? 0.0;
+      final cost = double.tryParse(_wasteCostController.text) ?? 0.0;
+      final totalLoss = double.tryParse(_wasteTotalController.text) ?? 0.0;
+      final dateStr = _wasteDate.toIso8601String().split('T')[0];
+      final reason = _selectedReason;
+      final notes = _wasteNotesController.text.trim();
+
+      if (widget.wasteToEdit != null) {
+        success = await provider.updateWaste(
+          id: JsonUtils.parseInt(widget.wasteToEdit!['id']),
+          inventoryItemId: _wasteItemType == 'raw' ? _wasteIngredientId : null,
+          menuId: _wasteItemType == 'menu' ? _wasteMenuId : null,
+          quantity: qty,
+          costPerUnit: cost,
+          totalLoss: totalLoss,
+          wasteDate: dateStr,
+          reason: reason,
+          notes: notes.isNotEmpty ? notes : null,
+        );
+      } else {
+        success = await provider.createWaste(
+          inventoryItemId: _wasteItemType == 'raw' ? _wasteIngredientId : null,
+          menuId: _wasteItemType == 'menu' ? _wasteMenuId : null,
+          quantity: qty,
+          costPerUnit: cost,
+          totalLoss: totalLoss,
+          wasteDate: dateStr,
+          reason: reason,
+          notes: notes.isNotEmpty ? notes : null,
+        );
+      }
     }
 
     if (mounted) {
@@ -1292,7 +1568,13 @@ class _AddInventorySheetState extends State<_AddInventorySheet> {
           Row(
             children: [
               Text(
-                widget.itemToEdit != null ? 'Edit Inventory Item' : (widget.supplierToEdit != null ? 'Edit Supplier' : 'Log / Add Inventory'),
+                widget.itemToEdit != null 
+                    ? 'Edit Inventory Item' 
+                    : (widget.supplierToEdit != null 
+                        ? 'Edit Supplier' 
+                        : (widget.wasteToEdit != null 
+                            ? 'Edit Waste Event' 
+                            : 'Log / Add Inventory')),
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -1308,7 +1590,7 @@ class _AddInventorySheetState extends State<_AddInventorySheet> {
           ),
           const SizedBox(height: 10),
           
-          if (widget.itemToEdit == null && widget.supplierToEdit == null) ...[
+          if (widget.itemToEdit == null && widget.supplierToEdit == null && widget.wasteToEdit == null) ...[
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -1318,6 +1600,8 @@ class _AddInventorySheetState extends State<_AddInventorySheet> {
                   _typeChip('purchase', 'Log Purchase', Icons.add_shopping_cart_rounded),
                   const SizedBox(width: 8),
                   _typeChip('usage', 'Log Usage', Icons.remove_shopping_cart_rounded),
+                  const SizedBox(width: 8),
+                  _typeChip('waste', 'Log Waste', Icons.delete_outline_rounded),
                   const SizedBox(width: 8),
                   _typeChip('supplier', 'Add Supplier', Icons.person_add_alt_1_outlined),
                 ],
@@ -1621,6 +1905,194 @@ class _AddInventorySheetState extends State<_AddInventorySheet> {
           const SizedBox(height: 16),
           _fieldLabel('Notes / Purpose'),
           _textInput(_usageNotesController, 'e.g. Used for Baking, Latte recipe, etc.'),
+        ],
+      );
+    } else if (_activeType == 'waste') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _fieldLabel('Item Type'),
+          Row(
+            children: [
+              Expanded(
+                child: ChoiceChip(
+                  showCheckmark: false,
+                  label: Center(child: Text('Raw Material', style: GoogleFonts.poppins(fontSize: 12))),
+                  selected: _wasteItemType == 'raw',
+                  selectedColor: AppColors.accentAmber,
+                  backgroundColor: AppColors.darkCard,
+                  labelStyle: TextStyle(color: _wasteItemType == 'raw' ? Colors.white : AppColors.textSecondary),
+                  onSelected: (selected) {
+                    if (selected) setState(() => _wasteItemType = 'raw');
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ChoiceChip(
+                  showCheckmark: false,
+                  label: Center(child: Text('Menu Item', style: GoogleFonts.poppins(fontSize: 12))),
+                  selected: _wasteItemType == 'menu',
+                  selectedColor: AppColors.accentAmber,
+                  backgroundColor: AppColors.darkCard,
+                  labelStyle: TextStyle(color: _wasteItemType == 'menu' ? Colors.white : AppColors.textSecondary),
+                  onSelected: (selected) {
+                    if (selected) setState(() => _wasteItemType = 'menu');
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          if (_wasteItemType == 'raw') ...[
+            _fieldLabel('Select Ingredient'),
+            DropdownButtonFormField<int>(
+              value: _wasteIngredientId,
+              dropdownColor: AppColors.darkCard,
+              decoration: _inputDecoration('Select Ingredient'),
+              validator: (v) => _wasteItemType == 'raw' && v == null ? 'Required' : null,
+              items: provider.items.map((i) => DropdownMenuItem<int>(
+                value: JsonUtils.parseInt(i['id']),
+                child: Text(i['name'] ?? '', style: GoogleFonts.poppins(color: AppColors.textPrimary)),
+              )).toList(),
+              onChanged: (val) {
+                setState(() {
+                  _wasteIngredientId = val;
+                  final matchingPurchases = provider.purchases.where((p) => JsonUtils.parseInt(p['inventory_item_id']) == val).toList();
+                  if (matchingPurchases.isNotEmpty) {
+                    _wasteCostController.text = (matchingPurchases.first['unit_price'] ?? '').toString();
+                    _calculateWasteTotal();
+                  }
+                });
+              },
+            ),
+          ] else ...[
+            _fieldLabel('Select Menu Item'),
+            DropdownButtonFormField<int>(
+              value: _wasteMenuId,
+              dropdownColor: AppColors.darkCard,
+              decoration: _inputDecoration('Select Menu Item'),
+              validator: (v) => _wasteItemType == 'menu' && v == null ? 'Required' : null,
+              items: provider.menus.map((m) => DropdownMenuItem<int>(
+                value: JsonUtils.parseInt(m['id']),
+                child: Text(m['name'] ?? '', style: GoogleFonts.poppins(color: AppColors.textPrimary)),
+              )).toList(),
+              onChanged: (val) {
+                setState(() {
+                  _wasteMenuId = val;
+                  final matchingMenu = provider.menus.firstWhere((m) => JsonUtils.parseInt(m['id']) == val);
+                  _wasteCostController.text = (matchingMenu['cost_price'] ?? matchingMenu['price'] ?? '0.00').toString();
+                  _calculateWasteTotal();
+                });
+              },
+            ),
+          ],
+          const SizedBox(height: 16),
+
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _fieldLabel('Quantity Wasted'),
+                    _textInput(
+                      _wasteQtyController, 
+                      'Qty (e.g. 2)', 
+                      keyboard: TextInputType.number, 
+                      onChanged: (v) => _calculateWasteTotal(), 
+                      validator: (v) => double.tryParse(v ?? '') == null ? 'Invalid quantity' : null
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _fieldLabel('Date'),
+                    InkWell(
+                      onTap: () => _selectDate(context, 'waste'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        decoration: BoxDecoration(
+                          color: AppColors.darkCard,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.darkBorder),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.textSecondary),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${_wasteDate.year}-${_wasteDate.month.toString().padLeft(2, '0')}-${_wasteDate.day.toString().padLeft(2, '0')}',
+                              style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _fieldLabel('Cost Price / Unit'),
+                    _textInput(
+                      _wasteCostController, 
+                      'Unit Cost', 
+                      keyboard: TextInputType.number, 
+                      onChanged: (v) => _calculateWasteTotal(), 
+                      validator: (v) => double.tryParse(v ?? '') == null ? 'Invalid cost' : null
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _fieldLabel('Total Financial Loss'),
+                    _textInput(
+                      _wasteTotalController, 
+                      'Total Loss', 
+                      keyboard: TextInputType.number, 
+                      validator: (v) => double.tryParse(v ?? '') == null ? 'Invalid total' : null
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          _fieldLabel('Reason for Waste'),
+          DropdownButtonFormField<String>(
+            value: _selectedReason,
+            dropdownColor: AppColors.darkCard,
+            decoration: _inputDecoration('Select Reason'),
+            items: ['Spoiled / Rotten', 'Expired', 'Spilled / Dropped', 'Customer Return', 'Prep Error']
+                .map((r) => DropdownMenuItem<String>(
+              value: r,
+              child: Text(r, style: GoogleFonts.poppins(color: AppColors.textPrimary)),
+            )).toList(),
+            onChanged: (val) => setState(() => _selectedReason = val ?? 'Spoiled / Rotten'),
+          ),
+          const SizedBox(height: 16),
+
+          _fieldLabel('Notes'),
+          _textInput(_wasteNotesController, 'Write details about the waste/damage (optional)'),
         ],
       );
     } else {

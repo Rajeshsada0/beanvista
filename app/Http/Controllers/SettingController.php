@@ -40,6 +40,9 @@ class SettingController extends Controller
                 $path = $request->file($key)->store('settings', 'public');
                 $setting->update(['value' => $path]);
             } else if ($setting->type !== 'file') {
+                if (is_bool($value)) {
+                    $value = $value ? 'true' : 'false';
+                }
                 $setting->update(['value' => $value]);
             }
         }

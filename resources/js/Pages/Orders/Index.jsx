@@ -31,6 +31,7 @@ const calculateDuration = (start, end) => {
 export default function OrderIndex({ orders, filters, counts }) {
     const { settings } = usePage().props;
     const currency = settings?.currency_symbol || 'रू.';
+    const canEditCompleted = settings?.enable_completed_order_edit === 'true' || settings?.enable_completed_order_edit === true || settings?.enable_completed_order_edit === '1' || settings?.enable_completed_order_edit === 1;
     const [confirmDelete, setConfirmDelete] = useState({ show: false, orderId: null });
     const [expandedOrders, setExpandedOrders] = useState({});
     const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -412,12 +413,12 @@ export default function OrderIndex({ orders, filters, counts }) {
                                                                 Complete
                                                             </button>
                                                         )}
-                                                        {!['completed', 'cancelled'].includes(order.status) && (
+                                                        {(!['completed', 'cancelled'].includes(order.status) || (order.status === 'completed' && canEditCompleted)) && (
                                                             <Link 
                                                                 href={route('orders.edit', order.id)}
                                                                 className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-white bg-brand-600 hover:bg-brand-700 transition-all shadow-lg shadow-brand-500/20"
                                                             >
-                                                                Manage
+                                                                {order.status === 'completed' ? 'Edit Order' : 'Manage'}
                                                             </Link>
                                                         )}
                                                         {order.status === 'completed' && (
@@ -568,12 +569,22 @@ export default function OrderIndex({ orders, filters, counts }) {
                                                 </Link>
                                             </div>
                                         ) : order.status === 'completed' ? (
-                                            <Link 
-                                                href={route('orders.receipt', order.id)}
-                                                className="w-full sm:w-auto flex justify-center items-center px-2.5 py-2 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-xl bg-gray-50 text-gray-500 text-[9px] sm:text-[10px] font-black uppercase tracking-widest border border-gray-100 hover:bg-white transition-all active:scale-95"
-                                            >
-                                                View Receipt <ChevronRight className="w-2.5 h-2.5 sm:w-3 sm:h-3 ml-1" />
-                                            </Link>
+                                            <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-1.5 sm:gap-2 w-full sm:w-auto">
+                                                {canEditCompleted && (
+                                                    <Link 
+                                                        href={route('orders.edit', order.id)}
+                                                        className="w-full sm:w-auto flex justify-center items-center px-2.5 py-2 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl bg-brand-600 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand-500/20 hover:bg-brand-700 transition-all active:scale-95"
+                                                    >
+                                                        Edit <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 ml-1" />
+                                                    </Link>
+                                                )}
+                                                <Link 
+                                                    href={route('orders.receipt', order.id)}
+                                                    className="w-full sm:w-auto flex justify-center items-center px-2.5 py-2 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-xl bg-gray-50 text-gray-500 text-[9px] sm:text-[10px] font-black uppercase tracking-widest border border-gray-100 hover:bg-white transition-all active:scale-95"
+                                                >
+                                                    View Receipt <ChevronRight className="w-2.5 h-2.5 sm:w-3 sm:h-3 ml-1" />
+                                                </Link>
+                                            </div>
                                         ) : (
                                             <div className="w-full sm:w-auto flex justify-center items-center px-2.5 py-2 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-xl bg-red-50 text-red-500 text-[9px] sm:text-[10px] font-black uppercase tracking-widest border border-red-100">
                                                 Cancelled

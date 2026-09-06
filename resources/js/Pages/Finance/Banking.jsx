@@ -1,36 +1,47 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, useForm, usePage, router } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
-import { Landmark, Plus, Edit2, Trash2, Calendar, Hash, ArrowRightLeft, CreditCard, Wallet, Activity, CheckCircle2, CircleDashed } from 'lucide-react';
+import { Landmark, Plus, Edit2, Trash2, Calendar, Hash, ArrowRightLeft, CreditCard, Wallet, Activity, CheckCircle2, CircleDashed, QrCode, X, Eye, Upload } from 'lucide-react';
 
 export default function Banking({ auth, accounts, transactions }) {
     const { settings } = usePage().props;
     const currency = settings?.currency_symbol || '$';
     const [isAddingBank, setIsAddingBank] = useState(false);
     const [editingBank, setEditingBank] = useState(null);
-    const { data, setData, post, put, delete: destroy, processing, errors, reset } = useForm({
+    const [qrPreview, setQrPreview] = useState(null);
+    const [previewQrModal, setPreviewQrModal] = useState({ isOpen: false, account: null });
+    const { data, setData, processing, errors, reset } = useForm({
         account_name: '',
         bank_name: '',
         account_number: '',
         account_type: 'checking',
         balance: '',
+        qr_code: null,
+        remove_qr: false,
     });
 
     const submitBank = (e) => {
         e.preventDefault();
         if (editingBank) {
-            put(route('finance.banking.update', editingBank.id), {
+            router.post(route('finance.banking.update', editingBank.id), {
+                ...data,
+                _method: 'PUT',
+            }, {
+                forceFormData: true,
                 onSuccess: () => {
                     setIsAddingBank(false);
                     setEditingBank(null);
+                    setQrPreview(null);
                     reset();
                 }
             });
         } else {
-            post(route('finance.banking.store'), {
+            router.post(route('finance.banking.store'), data, {
+                forceFormData: true,
                 onSuccess: () => {
                     setIsAddingBank(false);
+                    setQrPreview(null);
                     reset();
                 }
             });
@@ -39,18 +50,21 @@ export default function Banking({ auth, accounts, transactions }) {
 
     const handleDelete = (id) => {
         if (confirm('Are you sure you want to delete this bank account?')) {
-            destroy(route('finance.banking.destroy', id));
+            router.delete(route('finance.banking.destroy', id));
         }
     };
 
     const openEdit = (account) => {
         setEditingBank(account);
+        setQrPreview(account.qr_code_url || null);
         setData({
             account_name: account.account_name,
             bank_name: account.bank_name || '',
             account_number: account.account_number || '',
             account_type: account.account_type || 'checking',
             balance: account.balance || '',
+            qr_code: null,
+            remove_qr: false,
         });
         setIsAddingBank(true);
     };
@@ -128,6 +142,17 @@ export default function Banking({ auth, accounts, transactions }) {
                                             <p className="text-xs text-slate-500 font-medium mt-0.5">{account.bank_name || 'N/A'} {account.account_number ? `• ${account.account_number.slice(-4)}` : ''}</p>
                                         </div>
                                     </div>
+                                    {account.qr_code_url && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setPreviewQrModal({ isOpen: true, account })}
+                                            className="flex items-center gap-1 px-2.5 py-1 bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-bold rounded-lg border border-brand-200 transition-colors shadow-xs shrink-0"
+                                            title="View Payment QR Code"
+                                        >
+                                            <QrCode size={13} />
+                                            <span>QR</span>
+                                        </button>
+                                    )}
                                 </div>
                                 
                                 <div className="mt-auto pt-6">
@@ -280,10 +305,64 @@ export default function Banking({ auth, accounts, transactions }) {
                                 required
                             />
                         </div>
+
+                        <div>
+                            <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1.5">Payment QR Code (Optional)</label>
+                            {qrPreview ? (
+                                <div className="relative border-2 border-brand-200 bg-brand-50/50 rounded-xl p-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <img 
+                                            src={qrPreview} 
+                                            alt="QR Preview" 
+                                            className="w-16 h-16 object-contain rounded-lg bg-white border border-slate-200 p-1 shadow-sm"
+                                        />
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-800">Payment QR Attached</p>
+                                            <p className="text-[11px] text-slate-500">Will be displayed during online customer checkout</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setData(d => ({ ...d, qr_code: null, remove_qr: true }));
+                                            setQrPreview(null);
+                                        }}
+                                        className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
+                                        title="Remove QR Code"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 hover:border-brand-500 hover:bg-brand-50/30 rounded-xl p-4 cursor-pointer transition-all group">
+                                    <div className="p-2.5 rounded-full bg-slate-100 group-hover:bg-brand-100 text-slate-500 group-hover:text-brand-600 transition-colors mb-2">
+                                        <QrCode size={22} />
+                                    </div>
+                                    <span className="text-xs font-bold text-slate-700 group-hover:text-brand-600">Click to upload Payment QR Code</span>
+                                    <span className="text-[11px] text-slate-400 mt-0.5">PNG, JPG or WEBP (Max 3MB)</span>
+                                    <input 
+                                        type="file" 
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files[0];
+                                            if (file) {
+                                                setData(d => ({ ...d, qr_code: file, remove_qr: false }));
+                                                const reader = new FileReader();
+                                                reader.onload = (ev) => setQrPreview(ev.target.result);
+                                                reader.readAsDataURL(file);
+                                            }
+                                        }}
+                                        className="hidden" 
+                                    />
+                                </label>
+                            )}
+                            {errors.qr_code && <p className="mt-1.5 text-sm text-red-600 font-medium">{errors.qr_code}</p>}
+                        </div>
+
                         <div className="mt-8 flex justify-end gap-3">
                             <button
                                 type="button"
-                                onClick={() => { setIsAddingBank(false); setEditingBank(null); reset(); }}
+                                onClick={() => { setIsAddingBank(false); setEditingBank(null); setQrPreview(null); reset(); }}
                                 className="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
                             >
                                 Cancel
@@ -298,6 +377,39 @@ export default function Banking({ auth, accounts, transactions }) {
                         </div>
                     </form>
                 </div>
+            </Modal>
+
+            {/* QR Code Preview Modal */}
+            <Modal show={previewQrModal.isOpen} onClose={() => setPreviewQrModal({ isOpen: false, account: null })} maxWidth="sm">
+                {previewQrModal.account && (
+                    <div className="p-6 text-center">
+                        <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+                            <div className="text-left">
+                                <h3 className="font-bold text-slate-900 text-base">{previewQrModal.account.account_name}</h3>
+                                <p className="text-xs text-slate-500">{previewQrModal.account.bank_name || 'Bank Account'}</p>
+                            </div>
+                            <button 
+                                onClick={() => setPreviewQrModal({ isOpen: false, account: null })} 
+                                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 inline-block mb-4 shadow-inner">
+                            <img 
+                                src={previewQrModal.account.qr_code_url} 
+                                alt="Payment QR" 
+                                className="w-64 h-64 object-contain rounded-xl bg-white p-2 border border-slate-100 shadow-sm mx-auto"
+                            />
+                        </div>
+
+                        <p className="text-xs font-semibold text-slate-600 mb-2">Scan to pay with any supported Mobile Banking app</p>
+                        {previewQrModal.account.account_number && (
+                            <p className="text-xs text-slate-400 font-mono">A/C: {previewQrModal.account.account_number}</p>
+                        )}
+                    </div>
+                )}
             </Modal>
         </AuthenticatedLayout>
     );

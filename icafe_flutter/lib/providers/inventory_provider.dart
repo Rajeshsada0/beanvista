@@ -7,6 +7,7 @@ class InventoryProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _items = [];
   List<Map<String, dynamic>> _purchases = [];
   List<Map<String, dynamic>> _usages = [];
+  List<Map<String, dynamic>> _wastes = [];
   List<Map<String, dynamic>> _suppliers = [];
   List<Map<String, dynamic>> _groups = [];
   List<Map<String, dynamic>> _units = [];
@@ -21,6 +22,7 @@ class InventoryProvider extends ChangeNotifier {
   List<Map<String, dynamic>> get items => _items;
   List<Map<String, dynamic>> get purchases => _purchases;
   List<Map<String, dynamic>> get usages => _usages;
+  List<Map<String, dynamic>> get wastes => _wastes;
   List<Map<String, dynamic>> get suppliers => _suppliers;
   List<Map<String, dynamic>> get groups => _groups;
   List<Map<String, dynamic>> get units => _units;
@@ -61,6 +63,9 @@ class InventoryProvider extends ChangeNotifier {
         }
         if (response['recipes'] != null) {
           _recipes = List<Map<String, dynamic>>.from(response['recipes']);
+        }
+        if (response['recentWastes'] != null) {
+          _wastes = List<Map<String, dynamic>>.from(response['recentWastes']);
         }
       } else {
         _error = 'Failed to load inventory data';
@@ -501,6 +506,108 @@ class InventoryProvider extends ChangeNotifier {
       return false;
     } catch (e) {
       _error = 'Failed to delete group: $e';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> createWaste({
+    int? inventoryItemId,
+    int? menuId,
+    required double quantity,
+    required double costPerUnit,
+    required double totalLoss,
+    required String wasteDate,
+    required String reason,
+    String? notes,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.post('/inventory/wastes', {
+        if (inventoryItemId != null) 'inventory_item_id': inventoryItemId,
+        if (menuId != null) 'menu_id': menuId,
+        'quantity': quantity,
+        'cost_per_unit': costPerUnit,
+        'total_loss': totalLoss,
+        'waste_date': wasteDate,
+        'reason': reason,
+        if (notes != null) 'notes': notes,
+      });
+
+      if (response != null && response['success'] == true) {
+        await fetchInventory();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _error = 'Failed to log waste: $e';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateWaste({
+    required int id,
+    int? inventoryItemId,
+    int? menuId,
+    required double quantity,
+    required double costPerUnit,
+    required double totalLoss,
+    required String wasteDate,
+    required String reason,
+    String? notes,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.put('/inventory/wastes/$id', {
+        if (inventoryItemId != null) 'inventory_item_id': inventoryItemId,
+        if (menuId != null) 'menu_id': menuId,
+        'quantity': quantity,
+        'cost_per_unit': costPerUnit,
+        'total_loss': totalLoss,
+        'waste_date': wasteDate,
+        'reason': reason,
+        if (notes != null) 'notes': notes,
+      });
+
+      if (response != null && response['success'] == true) {
+        await fetchInventory();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _error = 'Failed to update waste: $e';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> deleteWaste(int id) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.delete('/inventory/wastes/$id');
+      if (response == true) {
+        await fetchInventory();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _error = 'Failed to delete waste: $e';
       return false;
     } finally {
       _isLoading = false;

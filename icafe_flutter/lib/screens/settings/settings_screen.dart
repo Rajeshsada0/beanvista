@@ -657,6 +657,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _saveSetting('enable_guest_qr', !currentValue);
   }
 
+  void _toggleCompletedOrderEdit(bool currentValue) async {
+    await _saveSetting('enable_completed_order_edit', !currentValue);
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -745,6 +749,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: app.enableGuestQr ? 'ENABLED' : 'DISABLED',
               iconColor: app.enableGuestQr ? AppColors.statusGreen : AppColors.statusRed,
               onTap: isAdmin ? () => _toggleGuestQr(app.enableGuestQr) : null,
+            ),
+            Divider(height: 1, indent: 56, color: AppColors.darkBorder),
+            _TappableTile(
+              icon: Icons.edit_note_rounded,
+              label: 'Edit Completed Orders',
+              value: app.enableCompletedOrderEdit ? 'ENABLED' : 'DISABLED',
+              iconColor: app.enableCompletedOrderEdit ? AppColors.statusGreen : AppColors.statusRed,
+              onTap: isAdmin ? () => _toggleCompletedOrderEdit(app.enableCompletedOrderEdit) : null,
             ),
             Divider(height: 1, indent: 56, color: AppColors.darkBorder),
             _TappableTile(

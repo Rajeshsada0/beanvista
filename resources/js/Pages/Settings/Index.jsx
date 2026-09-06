@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
-import { Settings, Globe, Palette, Languages, Save, Image as ImageIcon, CheckCircle2, Info, Star, ChefHat, AlertTriangle, Printer, FileText, UserCheck, QrCode, Zap, ArrowUp } from 'lucide-react';
+import { Settings, Globe, Palette, Languages, Save, Image as ImageIcon, CheckCircle2, Info, Star, ChefHat, AlertTriangle, Printer, FileText, UserCheck, QrCode, Zap, ArrowUp, Edit3 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 export default function SettingIndex({ settings }) {
@@ -23,6 +23,7 @@ export default function SettingIndex({ settings }) {
         auto_print_receipt: settings.auto_print_receipt === 'true' || settings.auto_print_receipt === true || settings.auto_print_receipt === '1' || settings.auto_print_receipt === 1,
         address: settings.address || '',
         enable_guest_qr: settings.enable_guest_qr === 'true' || settings.enable_guest_qr === true || settings.enable_guest_qr === '1' || settings.enable_guest_qr === 1,
+        enable_completed_order_edit: settings.enable_completed_order_edit === 'true' || settings.enable_completed_order_edit === true || settings.enable_completed_order_edit === '1' || settings.enable_completed_order_edit === 1,
         site_logo: null,
         site_favicon: null,
         mail_host: settings.mail_host || '',
@@ -164,6 +165,24 @@ export default function SettingIndex({ settings }) {
                                     </div>
                                     <div className={`shrink-0 w-12 h-6 rounded-full relative transition-all duration-300 ${data.enable_guest_qr ? 'bg-blue-600' : 'bg-gray-200'}`}>
                                         <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-300 ${data.enable_guest_qr ? 'left-7' : 'left-1'}`}></div>
+                                    </div>
+                                </div>
+
+                                <div 
+                                    onClick={() => setData('enable_completed_order_edit', !data.enable_completed_order_edit)}
+                                    className="flex items-center justify-between p-4 rounded-lg bg-white border border-gray-200 cursor-pointer hover:bg-gray-50 transition-all group gap-4"
+                                >
+                                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                        <div className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${data.enable_completed_order_edit ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
+                                            <Edit3 className="w-5 h-5" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-bold text-gray-900 truncate">Edit Completed Orders</p>
+                                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">Allow staff and admin to edit or modify orders after they are marked completed.</p>
+                                        </div>
+                                    </div>
+                                    <div className={`shrink-0 w-12 h-6 rounded-full relative transition-all duration-300 ${data.enable_completed_order_edit ? 'bg-blue-600' : 'bg-gray-200'}`}>
+                                        <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-300 ${data.enable_completed_order_edit ? 'left-7' : 'left-1'}`}></div>
                                     </div>
                                 </div>
                             </div>

@@ -421,19 +421,7 @@ class ApiController extends Controller
         // Dynamic Notifications for Dashboard
         $notifications = [];
 
-        // 1. System Welcome Notification
-        $tenantUser = auth()->user();
-        if ($tenantUser) {
-            $notifications[] = [
-                'id' => 'system_welcome',
-                'title' => 'System Update Successful',
-                'body' => 'iCafe backend successfully upgraded to v2.4.0.',
-                'time' => Carbon::parse($tenantUser->created_at)->diffForHumans(),
-                'type' => 'system',
-                'isRead' => true,
-                'route' => 'Dashboard',
-            ];
-        }
+
 
         // 2. Unpaid Bills (Pending/Preparing/Served Orders)
         $unpaidOrders = Order::with('table')
@@ -829,6 +817,21 @@ class ApiController extends Controller
 
             if ($isEdit) {
                 $order = Order::findOrFail($validated['order_id']);
+
+                if ($order->status === 'completed') {
+                    $tenantId = auth()->user()?->tenant_id ?? $order->tenant_id;
+                    $allowEdit = Setting::where('tenant_id', $tenantId)
+                        ->where('key', 'enable_completed_order_edit')
+                        ->value('value');
+                    $canEditCompleted = in_array($allowEdit, ['true', '1', true, 1], true);
+
+                    if (!$canEditCompleted) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Completed orders cannot be modified. You can enable this in Settings.'
+                        ], 422);
+                    }
+                }
                 $order->update([
                     'table_id' => $validated['table_id'] ?? $order->table_id,
                     'customer_id' => $customerId ?? $order->customer_id,
@@ -1491,6 +1494,8 @@ class ApiController extends Controller
                     'bank_name' => $acc->bank_name,
                     'account_type' => $acc->account_type,
                     'balance' => (float)$acc->balance,
+                    'qr_code' => $acc->qr_code,
+                    'qr_code_url' => $acc->qr_code_url,
                 ];
             })
         ]);
@@ -1565,6 +1570,21 @@ class ApiController extends Controller
             }
 
             $wasCompleted = $order->status === 'completed';
+
+            if ($wasCompleted && isset($validated['status']) && $validated['status'] !== 'completed') {
+                $tenantId = auth()->user()?->tenant_id ?? $order->tenant_id;
+                $allowEdit = Setting::where('tenant_id', $tenantId)
+                    ->where('key', 'enable_completed_order_edit')
+                    ->value('value');
+                $canEditCompleted = in_array($allowEdit, ['true', '1', true, 1], true);
+
+                if (!$canEditCompleted) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Completed orders cannot be modified. You can enable this in Settings.'
+                    ], 422);
+                }
+            }
 
             if (isset($validated['status'])) {
                 $order->status = $validated['status'];
@@ -1985,6 +2005,7 @@ class ApiController extends Controller
             'auto_print_receipt' => 'false',
             'address' => '',
             'enable_guest_qr' => 'false',
+            'enable_completed_order_edit' => 'false',
         ];
 
         foreach ($defaults as $k => $v) {
@@ -2048,6 +2069,10 @@ class ApiController extends Controller
                     'updated_at' => now(),
                 ]);
             }
+        }
+
+        if ($tenantId) {
+            cache()->forget('settings_tenant_' . $tenantId);
         }
 
         return response()->json([
@@ -2137,6 +2162,20 @@ class ApiController extends Controller
                 'qty' => (float)$r->quantity_per_serving,
                 'item_name' => $r->inventoryItem ? $r->inventoryItem->name : 'Item',
                 'unit' => $r->inventoryItem ? ($r->inventoryItem->measuringUnit ? $r->inventoryItem->measuringUnit->short_name : ($r->inventoryItem->unit ?? '-')) : '-',
+            ]),
+            'recentWastes' => \App\Models\InventoryWaste::with(['inventoryItem', 'menu'])->latest()->take(100)->get()->map(fn($w) => [
+                'id' => $w->id,
+                'inventory_item_id' => $w->inventory_item_id,
+                'menu_id' => $w->menu_id,
+                'item_name' => $w->inventoryItem ? $w->inventoryItem->name : ($w->menu ? $w->menu->name : 'Item'),
+                'type' => $w->inventoryItem ? 'raw' : 'menu',
+                'qty' => (float)$w->quantity,
+                'unit' => $w->inventoryItem && $w->inventoryItem->measuringUnit ? $w->inventoryItem->measuringUnit->short_name : ($w->inventoryItem->unit ?? '-'),
+                'cost_per_unit' => (float)$w->cost_per_unit,
+                'total_loss' => (float)$w->total_loss,
+                'date' => $w->waste_date ? $w->waste_date->format('M d, Y') : '',
+                'reason' => $w->reason,
+                'notes' => $w->notes ?? '',
             ]),
         ]);
     }
@@ -2320,6 +2359,224 @@ class ApiController extends Controller
             'message' => 'Usage logged successfully',
             'data' => $usage,
         ]);
+    }
+
+    /**
+     * Store inventory waste/damage.
+     */
+    public function storeInventoryWaste(Request $request)
+    {
+        $validated = $request->validate([
+            'inventory_item_id' => 'nullable|exists:inventory_items,id',
+            'menu_id'           => 'nullable|exists:menus,id',
+            'quantity'          => 'required|numeric|min:0.01',
+            'cost_per_unit'     => 'required|numeric|min:0',
+            'total_loss'        => 'required|numeric|min:0',
+            'waste_date'        => 'required|date',
+            'reason'            => 'required|string|max:255',
+            'notes'             => 'nullable|string',
+        ]);
+
+        if (empty($validated['inventory_item_id']) && empty($validated['menu_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Select either a raw ingredient or a menu item.'
+            ], 422);
+        }
+
+        $validated['branch_id'] = Auth::user()->primary_branch_id;
+        $validated['tenant_id'] = Auth::user()->tenant_id;
+        if (!$validated['branch_id']) {
+            $validated['branch_id'] = \App\Models\Branch::value('id');
+        }
+
+        $waste = \App\Models\InventoryWaste::create($validated);
+
+        $this->apiDeductStockForWaste($waste);
+        $this->apiCreateFinanceJournalForWaste($waste);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Waste logged successfully',
+            'data' => $waste,
+        ]);
+    }
+
+    /**
+     * Update inventory waste/damage.
+     */
+    public function updateInventoryWaste(Request $request, $id)
+    {
+        $waste = \App\Models\InventoryWaste::find($id);
+        if (!$waste) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Waste record not found'
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'inventory_item_id' => 'nullable|exists:inventory_items,id',
+            'menu_id'           => 'nullable|exists:menus,id',
+            'quantity'          => 'required|numeric|min:0.01',
+            'cost_per_unit'     => 'required|numeric|min:0',
+            'total_loss'        => 'required|numeric|min:0',
+            'waste_date'        => 'required|date',
+            'reason'            => 'required|string|max:255',
+            'notes'             => 'nullable|string',
+        ]);
+
+        if (empty($validated['inventory_item_id']) && empty($validated['menu_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Select either a raw ingredient or a menu item.'
+            ], 422);
+        }
+
+        $this->apiRevertStockForWaste($waste);
+        $this->apiDeleteFinanceJournalForWaste($waste);
+
+        $waste->update($validated);
+
+        $this->apiDeductStockForWaste($waste);
+        $this->apiCreateFinanceJournalForWaste($waste);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Waste updated successfully',
+            'data' => $waste,
+        ]);
+    }
+
+    /**
+     * Delete inventory waste/damage.
+     */
+    public function deleteInventoryWaste($id)
+    {
+        $waste = \App\Models\InventoryWaste::find($id);
+        if (!$waste) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Waste record not found'
+            ], 404);
+        }
+
+        $this->apiRevertStockForWaste($waste);
+        $this->apiDeleteFinanceJournalForWaste($waste);
+        $waste->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Waste record deleted and stock restored',
+        ]);
+    }
+
+    protected function apiDeductStockForWaste($waste)
+    {
+        if ($waste->inventory_item_id) {
+            \App\Models\InventoryUsage::create([
+                'branch_id' => $waste->branch_id,
+                'tenant_id' => $waste->tenant_id,
+                'inventory_item_id' => $waste->inventory_item_id,
+                'quantity_used' => $waste->quantity,
+                'usage_date' => $waste->waste_date,
+                'notes' => "Waste Ref: {$waste->id} | Raw Material Waste: " . ($waste->notes ?? ''),
+            ]);
+
+            $item = \App\Models\InventoryItem::find($waste->inventory_item_id);
+            if ($item) {
+                $item->current_stock -= $waste->quantity;
+                $item->save();
+            }
+        } elseif ($waste->menu_id) {
+            $recipes = \App\Models\MenuRecipe::where('menu_id', $waste->menu_id)->get();
+            foreach ($recipes as $ingredient) {
+                $qtyToDeduct = $ingredient->quantity_per_serving * $waste->quantity;
+
+                $item = \App\Models\InventoryItem::find($ingredient->inventory_item_id);
+                if ($item) {
+                    $item->current_stock -= $qtyToDeduct;
+                    $item->save();
+                }
+
+                \App\Models\InventoryUsage::create([
+                    'branch_id' => $waste->branch_id,
+                    'tenant_id' => $waste->tenant_id,
+                    'inventory_item_id' => $ingredient->inventory_item_id,
+                    'quantity_used' => $qtyToDeduct,
+                    'usage_date' => $waste->waste_date,
+                    'notes' => "Waste Ref: {$waste->id} | Auto deduction for menu item: " . ($waste->menu ? $waste->menu->name : 'Menu Item'),
+                ]);
+            }
+        }
+    }
+
+    protected function apiRevertStockForWaste($waste)
+    {
+        if ($waste->inventory_item_id) {
+            $item = \App\Models\InventoryItem::find($waste->inventory_item_id);
+            if ($item) {
+                $item->current_stock += $waste->quantity;
+                $item->save();
+            }
+        }
+
+        $usages = \App\Models\InventoryUsage::where('notes', 'like', "Waste Ref: {$waste->id}%")->get();
+        foreach ($usages as $usage) {
+            if ($waste->menu_id) {
+                $item = \App\Models\InventoryItem::find($usage->inventory_item_id);
+                if ($item) {
+                    $item->current_stock += $usage->quantity_used;
+                    $item->save();
+                }
+            }
+            $usage->delete();
+        }
+    }
+
+    protected function apiCreateFinanceJournalForWaste($waste)
+    {
+        $tenantId = $waste->tenant_id ?? Auth::user()->tenant_id ?? 1;
+
+        $wasteExpenseAccount = \App\Models\Account::firstOrCreate(
+            ['tenant_id' => $tenantId, 'code' => '5005'],
+            ['name' => 'Food Waste Expense', 'type' => 'expense', 'description' => 'Losses due to spoiled, damaged, or wasted inventory']
+        );
+        $inventoryAssetAccount = \App\Models\Account::firstOrCreate(
+            ['tenant_id' => $tenantId, 'code' => '1004'],
+            ['name' => 'Inventory Asset', 'type' => 'asset', 'description' => 'Value of inventory on hand']
+        );
+
+        if (class_exists(\App\Models\JournalEntry::class)) {
+            $journalEntry = \App\Models\JournalEntry::create([
+                'tenant_id' => $tenantId,
+                'reference_number' => 'WST-' . $waste->id,
+                'date' => $waste->waste_date,
+                'description' => 'Food Waste/Damage: ' . ($waste->inventoryItem ? $waste->inventoryItem->name : ($waste->menu ? $waste->menu->name : 'Item')),
+                'status' => 'posted',
+            ]);
+
+            $journalEntry->lines()->create([
+                'account_id' => $wasteExpenseAccount->id,
+                'debit' => $waste->total_loss,
+                'credit' => 0,
+                'description' => 'Food Waste Expense Recognition',
+            ]);
+
+            $journalEntry->lines()->create([
+                'account_id' => $inventoryAssetAccount->id,
+                'debit' => 0,
+                'credit' => $waste->total_loss,
+                'description' => 'Inventory Write-off due to Waste/Damage',
+            ]);
+        }
+    }
+
+    protected function apiDeleteFinanceJournalForWaste($waste)
+    {
+        if (class_exists(\App\Models\JournalEntry::class)) {
+            \App\Models\JournalEntry::where('reference_number', 'WST-' . $waste->id)->delete();
+        }
     }
 
     /**
@@ -3730,17 +3987,23 @@ class ApiController extends Controller
                 'bank_name' => 'nullable|string|max:255',
                 'account_type' => 'required|in:checking,cash,online',
                 'balance' => 'required|numeric|min:0',
+                'qr_code' => 'nullable|image|max:3072',
             ]);
 
             $tenantId = auth()->user()->tenant_id;
 
-            $account = DB::transaction(function() use ($validated, $tenantId) {
+            $qrPath = null;
+            if ($request->hasFile('qr_code')) {
+                $qrPath = $request->file('qr_code')->store("tenants/{$tenantId}/bank_qrs", 'public');
+            }
+
+            $account = DB::transaction(function() use ($validated, $tenantId, $qrPath) {
                 $glAccount = \App\Models\Account::create([
                     'tenant_id' => $tenantId,
                     'name' => $validated['account_name'] . ' (Bank)',
                     'code' => '100' . rand(10, 99),
                     'type' => 'asset',
-                    'description' => 'Bank account for ' . $validated['bank_name']
+                    'description' => 'Bank account for ' . ($validated['bank_name'] ?? '')
                 ]);
 
                 return \App\Models\BankAccount::create([
@@ -3749,6 +4012,7 @@ class ApiController extends Controller
                     'account_number' => $validated['account_number'],
                     'bank_name' => $validated['bank_name'],
                     'account_type' => $validated['account_type'],
+                    'qr_code' => $qrPath,
                     'gl_account_id' => $glAccount->id,
                     'balance' => $validated['balance'],
                 ]);
@@ -3778,7 +4042,25 @@ class ApiController extends Controller
             'bank_name' => 'nullable|string|max:255',
             'account_type' => 'required|in:checking,cash,online',
             'balance' => 'required|numeric|min:0',
+            'qr_code' => 'nullable|image|max:3072',
+            'remove_qr' => 'nullable|boolean',
         ]);
+
+        $tenantId = auth()->user()->tenant_id ?? $account->tenant_id;
+
+        if ($request->hasFile('qr_code')) {
+            if ($account->qr_code && \Illuminate\Support\Facades\Storage::disk('public')->exists($account->qr_code)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($account->qr_code);
+            }
+            $validated['qr_code'] = $request->file('qr_code')->store("tenants/{$tenantId}/bank_qrs", 'public');
+        } elseif ($request->boolean('remove_qr')) {
+            if ($account->qr_code && \Illuminate\Support\Facades\Storage::disk('public')->exists($account->qr_code)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($account->qr_code);
+            }
+            $validated['qr_code'] = null;
+        }
+
+        unset($validated['remove_qr']);
 
         DB::transaction(function() use ($account, $validated) {
             $account->update($validated);
@@ -3786,7 +4068,7 @@ class ApiController extends Controller
             if ($account->glAccount) {
                 $account->glAccount->update([
                     'name' => $validated['account_name'] . ' (Bank)',
-                    'description' => 'Bank account for ' . $validated['bank_name']
+                    'description' => 'Bank account for ' . ($validated['bank_name'] ?? '')
                 ]);
             }
         });
@@ -3794,6 +4076,7 @@ class ApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Bank account updated successfully',
+            'account' => $account->fresh(),
         ]);
     }
 
@@ -3803,6 +4086,10 @@ class ApiController extends Controller
 
         if ($account->transactions()->exists()) {
             return response()->json(['success' => false, 'message' => 'Cannot delete account with existing transactions.'], 422);
+        }
+
+        if ($account->qr_code && \Illuminate\Support\Facades\Storage::disk('public')->exists($account->qr_code)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($account->qr_code);
         }
 
         DB::transaction(function() use ($account) {

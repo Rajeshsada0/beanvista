@@ -71,6 +71,7 @@ export default function Viewer({ menus = [], categories = [], tables = [], addon
     const [tableSearchQuery, setTableSearchQuery] = useState('');
     const defaultAccount = bankAccounts?.find(a => a.account_type === 'cash') || (bankAccounts?.length > 0 ? bankAccounts[0] : null);
     const [paymentMethod, setPaymentMethod] = useState(defaultAccount ? `bank_${defaultAccount.id}` : '');
+    const [viewingQrAccount, setViewingQrAccount] = useState(null);
 
     const viewerTables = useMemo(() => {
         return tables.filter(t => t.table_number.toLowerCase().includes(tableSearchQuery.toLowerCase()));
@@ -764,6 +765,23 @@ export default function Viewer({ menus = [], categories = [], tables = [], addon
                                     );
                                 })}
                             </div>
+                            {paymentMethod.startsWith('bank_') && (() => {
+                                const accId = parseInt(paymentMethod.replace('bank_', ''));
+                                const acc = bankAccounts?.find(a => a.id === accId);
+                                if (acc?.qr_code_url) {
+                                    return (
+                                        <button
+                                            type="button"
+                                            onClick={() => setViewingQrAccount(acc)}
+                                            className="mt-2 w-full py-1.5 px-3 bg-brand-50 border border-brand-200 text-brand-700 rounded-lg flex items-center justify-center gap-1.5 text-xs font-bold hover:bg-brand-100 transition-colors shadow-sm"
+                                        >
+                                            <QrCode size={14} className="text-brand-600" />
+                                            <span>Scan QR Code ({acc.account_name})</span>
+                                        </button>
+                                    );
+                                }
+                                return null;
+                            })()}
                         </div>
 
                         <div className="grid grid-cols-2 gap-2 mt-auto">
@@ -1240,6 +1258,49 @@ export default function Viewer({ menus = [], categories = [], tables = [], addon
                                 )}
                             </form>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* QR Code Viewer Modal */}
+            {viewingQrAccount && (
+                <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+                    <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center relative border border-gray-100">
+                        <button 
+                            type="button"
+                            onClick={() => setViewingQrAccount(null)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+                        >
+                            <X size={18} />
+                        </button>
+                        <div className="w-12 h-12 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center mx-auto mb-3">
+                            <QrCode size={24} />
+                        </div>
+                        <h3 className="text-lg font-black text-gray-900 mb-1">Scan to Pay</h3>
+                        <p className="text-xs text-gray-500 mb-3">{viewingQrAccount.account_name} &bull; {viewingQrAccount.bank_name}</p>
+                        
+                        <div className="p-3 bg-white border-2 border-dashed border-brand-200 rounded-2xl inline-block shadow-inner mb-3">
+                            <img 
+                                src={viewingQrAccount.qr_code_url} 
+                                alt="Payment QR" 
+                                className="w-56 h-56 object-contain rounded-xl"
+                            />
+                        </div>
+                        
+                        <div className="text-2xl font-black text-brand-700 mb-1">
+                            {currency}{total.toFixed(2)}
+                        </div>
+                        {viewingQrAccount.account_number && (
+                            <p className="text-xs font-mono text-gray-400 mb-4">A/C: {viewingQrAccount.account_number}</p>
+                        )}
+
+                        <button 
+                            type="button"
+                            onClick={() => setViewingQrAccount(null)}
+                            className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-sm transition-colors shadow-sm"
+                        >
+                            Done
+                        </button>
                     </div>
                 </div>
             )}

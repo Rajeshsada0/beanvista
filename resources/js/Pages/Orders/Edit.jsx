@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Plus, Minus, ArrowLeft, Coffee, Check, X, ShieldAlert, CreditCard, CheckCircle2, Percent, Banknote, QrCode, Wallet, UserPlus, Search, Gift, User, BookOpen, Clock, Flame, Bell, Utensils } from 'lucide-react';
 
 export default function EditOrder({ order, menus, table, customers, categories, addons, taxes, reservation_id }) {
-    const { settings, auth } = usePage().props;
+    const { settings, auth, bankAccounts } = usePage().props;
     const userRole = auth?.user?.role;
     const currency = settings?.currency_symbol || 'रू.';
     const isCreate = !order;
@@ -49,6 +49,13 @@ export default function EditOrder({ order, menus, table, customers, categories, 
     const [accountPaymentMode, setAccountPaymentMode] = useState('cash'); // 'cash' or 'online'
     const [duePaymentAmount, setDuePaymentAmount] = useState(0);
     const [bankAccountId, setBankAccountId] = useState(order?.bank_account_id || '');
+
+    useEffect(() => {
+        if ((paymentMethod === 'online' || paymentMethod === 'split') && !bankAccountId && bankAccounts?.length > 0) {
+            const preferred = bankAccounts.find(a => a.account_type === 'online') || bankAccounts[0];
+            if (preferred) setBankAccountId(preferred.id);
+        }
+    }, [paymentMethod, bankAccounts, bankAccountId]);
 
     // Customer & Loyalty State
     const [selectedCustomerId, setSelectedCustomerId] = useState(order?.customer_id || '');
@@ -1104,6 +1111,24 @@ export default function EditOrder({ order, menus, table, customers, categories, 
                                                 />
                                             </div>
                                         </div>
+
+                                        {Number(onlineAmount) > 0 && (
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-brand-400 uppercase mb-1">Select Bank Account for Online Portion</label>
+                                                <select 
+                                                    value={bankAccountId}
+                                                    onChange={(e) => setBankAccountId(e.target.value)}
+                                                    className="w-full bg-white border-none rounded-lg py-2 px-3 text-sm font-bold text-brand-700 focus:ring-2 focus:ring-brand-500/20"
+                                                >
+                                                    <option value="">Select an account</option>
+                                                    {bankAccounts?.map(acc => (
+                                                        <option key={acc.id} value={acc.id}>
+                                                            {acc.account_name} ({acc.bank_name}) - {currency}{acc.balance}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -1117,7 +1142,7 @@ export default function EditOrder({ order, menus, table, customers, categories, 
                                             className="w-full bg-white border-none rounded-lg py-2 px-3 text-sm font-bold text-brand-700 focus:ring-2 focus:ring-brand-500/20"
                                         >
                                             <option value="">Select an account</option>
-                                            {usePage().props.bankAccounts?.map(acc => (
+                                            {bankAccounts?.map(acc => (
                                                 <option key={acc.id} value={acc.id}>
                                                     {acc.account_name} ({acc.bank_name}) - {currency}{acc.balance}
                                                 </option>
@@ -1125,6 +1150,54 @@ export default function EditOrder({ order, menus, table, customers, categories, 
                                         </select>
                                     </div>
                                 )}
+
+                                {/* QR Code display for online payment or split payment with online amount */}
+                                {(paymentMethod === 'online' || (paymentMethod === 'split' && Number(onlineAmount) > 0)) && bankAccountId && (() => {
+                                    const selectedAccount = bankAccounts?.find(acc => String(acc.id) === String(bankAccountId));
+                                    if (!selectedAccount) return null;
+                                    const payableAmount = paymentMethod === 'split' ? Number(onlineAmount) : Number(grandTotal);
+
+                                    if (selectedAccount.qr_code_url) {
+                                        return (
+                                            <div className="p-4 bg-white rounded-2xl border border-brand-200 shadow-sm flex flex-col items-center text-center space-y-3">
+                                                <div className="flex items-center gap-2 text-brand-700">
+                                                    <QrCode className="w-5 h-5 text-brand-600" />
+                                                    <span className="text-xs font-black uppercase tracking-wider">Scan & Pay</span>
+                                                </div>
+                                                <div className="p-2.5 bg-white rounded-2xl border-2 border-dashed border-brand-200 shadow-inner">
+                                                    <img 
+                                                         src={selectedAccount.qr_code_url} 
+                                                         alt="Payment QR Code" 
+                                                         className="w-48 h-48 object-contain rounded-xl"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <div className="text-base font-black text-gray-900">
+                                                        {currency}{payableAmount.toFixed(2)}
+                                                    </div>
+                                                    <p className="text-xs font-bold text-brand-700">
+                                                        {selectedAccount.account_name} &bull; {selectedAccount.bank_name}
+                                                    </p>
+                                                    {selectedAccount.account_number && (
+                                                        <p className="text-[11px] font-mono text-gray-500">
+                                                            A/C: {selectedAccount.account_number}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <p className="text-[10px] font-medium text-gray-400">
+                                                    Scan with any Mobile Banking or Wallet App
+                                                </p>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div className="p-3 bg-amber-50 rounded-xl border border-amber-200/70 flex items-center gap-2.5 text-amber-700">
+                                            <QrCode className="w-4 h-4 shrink-0 text-amber-500" />
+                                            <span className="text-xs font-medium">No payment QR code configured for {selectedAccount.account_name}.</span>
+                                        </div>
+                                    );
+                                })()}
 
                                 {/* Customer Account Settlement Detail */}
                                 {paymentMethod === 'credit' && (

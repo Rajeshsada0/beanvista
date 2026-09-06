@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../core/constants/app_constants.dart';
 import '../core/services/api_service.dart';
 import '../core/utils/json_utils.dart';
 
@@ -11,6 +12,8 @@ class BankAccountItem {
   final String bankName;
   final String type;
   final double balance;
+  final String? qrCode;
+  final String? qrCodeUrl;
 
   BankAccountItem({
     required this.id,
@@ -19,10 +22,22 @@ class BankAccountItem {
     required this.bankName,
     this.type = '',
     this.balance = 0.0,
+    this.qrCode,
+    this.qrCodeUrl,
   });
 
   String get accountName => name;
   String get accountNumber => number;
+
+  String? get fullQrCodeUrl {
+    if (qrCodeUrl != null && qrCodeUrl!.isNotEmpty) {
+      return AppConstants.formatImageUrl(qrCodeUrl);
+    }
+    if (qrCode != null && qrCode!.isNotEmpty) {
+      return AppConstants.formatImageUrl(qrCode);
+    }
+    return null;
+  }
 
   factory BankAccountItem.fromJson(Map<String, dynamic> json) {
     return BankAccountItem(
@@ -32,6 +47,8 @@ class BankAccountItem {
       bankName: (json['bank_name'] ?? json['bank'] ?? '').toString(),
       type: (json['type'] ?? json['account_type'] ?? '').toString(),
       balance: JsonUtils.parseDouble(json['balance'] ?? json['current_balance']),
+      qrCode: json['qr_code']?.toString(),
+      qrCodeUrl: json['qr_code_url']?.toString(),
     );
   }
 }
@@ -174,6 +191,7 @@ class OrdersProvider extends ChangeNotifier {
   int? _modifyingOrderId;
   String? _modifyingOrderNumber;
   List<Map<String, dynamic>>? _modifyingCartItems;
+  String? _modifyingOrderStatus;
 
   OrdersProvider({required ApiService apiService, TablesProvider? tablesProvider})
       : _apiService = apiService,
@@ -203,6 +221,7 @@ class OrdersProvider extends ChangeNotifier {
   int? get modifyingOrderId => _modifyingOrderId;
   String? get modifyingOrderNumber => _modifyingOrderNumber;
   List<Map<String, dynamic>>? get modifyingCartItems => _modifyingCartItems;
+  String? get modifyingOrderStatus => _modifyingOrderStatus;
 
   void setPreselectedOrder(String? type, String? table) {
     _preselectedOrderType = type;
@@ -210,12 +229,13 @@ class OrdersProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void startOrderModification(int orderId, String orderNumber, List<Map<String, dynamic>> items, String? type, String? table) {
+  void startOrderModification(int orderId, String orderNumber, List<Map<String, dynamic>> items, String? type, String? table, {String? status}) {
     _modifyingOrderId = orderId;
     _modifyingOrderNumber = orderNumber;
     _modifyingCartItems = items;
     _preselectedOrderType = type;
     _preselectedTable = table;
+    _modifyingOrderStatus = status;
     notifyListeners();
   }
 
@@ -223,6 +243,7 @@ class OrdersProvider extends ChangeNotifier {
     _modifyingOrderId = null;
     _modifyingOrderNumber = null;
     _modifyingCartItems = null;
+    _modifyingOrderStatus = null;
     notifyListeners();
   }
 

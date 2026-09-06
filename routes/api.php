@@ -61,6 +61,9 @@ Route::middleware(ApiTokenAuth::class)->group(function () {
     Route::delete('/inventory/items/{id}', [ApiController::class, 'deleteInventoryItem']);
     Route::post('/inventory/purchases', [ApiController::class, 'storeInventoryPurchase']);
     Route::post('/inventory/usages', [ApiController::class, 'storeInventoryUsage']);
+    Route::post('/inventory/wastes', [ApiController::class, 'storeInventoryWaste']);
+    Route::put('/inventory/wastes/{id}', [ApiController::class, 'updateInventoryWaste']);
+    Route::delete('/inventory/wastes/{id}', [ApiController::class, 'deleteInventoryWaste']);
     Route::post('/inventory/suppliers', [ApiController::class, 'storeInventorySupplier']);
     Route::put('/inventory/suppliers/{id}', [ApiController::class, 'updateInventorySupplier']);
     Route::delete('/inventory/suppliers/{id}', [ApiController::class, 'deleteInventorySupplier']);
@@ -109,7 +112,7 @@ Route::middleware(ApiTokenAuth::class)->group(function () {
     
     Route::get('/finance/banking', [ApiController::class, 'getBanking']);
     Route::post('/finance/bank-accounts', [ApiController::class, 'storeBankAccount']);
-    Route::put('/finance/bank-accounts/{id}', [ApiController::class, 'updateBankAccount']);
+    Route::match(['PUT', 'POST'], '/finance/bank-accounts/{id}', [ApiController::class, 'updateBankAccount']);
     Route::delete('/finance/bank-accounts/{id}', [ApiController::class, 'deleteBankAccount']);
     
     Route::get('/finance/cash-counter', [ApiController::class, 'getCashCounter']);

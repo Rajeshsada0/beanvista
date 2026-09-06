@@ -1889,11 +1889,71 @@ class _OrderDetailSheet extends StatefulWidget {
 class _OrderDetailSheetState extends State<_OrderDetailSheet> {
   bool _isExpanded = false;
 
+  void _startModifyOrder(BuildContext ctx, Map<String, dynamic> order, String currentStatus) {
+    final menusList = ctx.read<MenuProvider>().menus;
+    final ordersProvider = ctx.read<OrdersProvider>();
+    Navigator.pop(ctx);
+    final itemsList = order['items_list'] as List<dynamic>? ?? [];
+    final cartItems = itemsList.map((item) {
+      MenuItem? matchingMenu;
+      String itemName = '';
+      int itemQty = 0;
+      double itemPrice = 0.0;
+      int? menuId;
+      String? kdsStatus;
+
+      if (item is OrderItemDetails) {
+        itemName = item.name;
+        itemQty = item.qty;
+        itemPrice = item.price;
+        menuId = item.menuId;
+        kdsStatus = item.kdsStatus;
+      } else if (item is Map) {
+        itemName = (item['name'] ?? '') as String;
+        itemQty = (item['qty'] ?? 0) as int;
+        itemPrice = ((item['price'] as num?) ?? 0).toDouble();
+        menuId = item['menu_id'] as int?;
+        kdsStatus = item['kds_status'] as String?;
+      }
+
+      try {
+        matchingMenu = menusList.firstWhere((m) =>
+            m.name.trim().toLowerCase() == itemName.trim().toLowerCase());
+      } catch (_) {
+        matchingMenu = null;
+      }
+
+      return {
+        'id': menuId ?? (matchingMenu != null ? matchingMenu.id : itemName.hashCode),
+        'name': itemName,
+        'price': itemPrice,
+        'qty': itemQty,
+        'category': 'Food',
+        'emoji': '🥪',
+        'kds_status': kdsStatus ?? 'pending',
+      };
+    }).toList();
+
+    ordersProvider.startOrderModification(
+      order['id'],
+      order['number'] ?? '',
+      cartItems,
+      order['type'],
+      order['table'],
+      status: currentStatus,
+    );
+
+    HomeShell.selectTabByLabel('POS');
+  }
+
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
     final parentContext = widget.parentContext;
     final status = (order['status'] as String? ?? 'pending').toLowerCase();
+    final isCompleted = status == 'completed' || status == 'paid' || status == 'done';
+    final isCancelled = status == 'cancelled' || status == 'canceled' || status == 'void';
+    final allowEditCompleted = context.watch<AppProvider>().enableCompletedOrderEdit;
     final isLight = !AppColors.isDark;
     final statusInfo = _getStatusInfo(status);
     final typeInfo = _getTypeInfo(order['type'] as String? ?? 'Dine-In');
@@ -2098,7 +2158,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
             ),
 
             // Pinned Actions Footer
-            if (status != 'completed' && status != 'paid' && status != 'done' && status != 'cancelled' && status != 'canceled' && status != 'void')
+            if (!isCancelled && (!isCompleted || allowEditCompleted))
               Container(
                 padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
                 decoration: BoxDecoration(
@@ -2118,69 +2178,10 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                         child: SizedBox(
                           height: 48,
                           child: OutlinedButton.icon(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              final menusList = context.read<MenuProvider>().menus;
-                              final itemsList =
-                                  order['items_list'] as List<dynamic>? ?? [];
-                              final cartItems = itemsList.map((item) {
-                                MenuItem? matchingMenu;
-                                String itemName = '';
-                                int itemQty = 0;
-                                double itemPrice = 0.0;
-                                int? menuId;
-                                String? kdsStatus;
-
-                                if (item is OrderItemDetails) {
-                                  itemName = item.name;
-                                  itemQty = item.qty;
-                                  itemPrice = item.price;
-                                  menuId = item.menuId;
-                                  kdsStatus = item.kdsStatus;
-                                } else if (item is Map) {
-                                  itemName = (item['name'] ?? '') as String;
-                                  itemQty = (item['qty'] ?? 0) as int;
-                                  itemPrice =
-                                      ((item['price'] as num?) ?? 0).toDouble();
-                                  menuId = item['menu_id'] as int?;
-                                  kdsStatus = item['kds_status'] as String?;
-                                }
-
-                                try {
-                                  matchingMenu = menusList.firstWhere((m) =>
-                                      m.name.trim().toLowerCase() ==
-                                      itemName.trim().toLowerCase());
-                                } catch (_) {
-                                  matchingMenu = null;
-                                }
-
-                                return {
-                                  'id': menuId ??
-                                      (matchingMenu != null
-                                          ? matchingMenu.id
-                                          : itemName.hashCode),
-                                  'name': itemName,
-                                  'price': itemPrice,
-                                  'qty': itemQty,
-                                  'category': 'Food',
-                                  'emoji': '🥪',
-                                  'kds_status': kdsStatus ?? 'pending',
-                                };
-                              }).toList();
-
-                              context.read<OrdersProvider>().startOrderModification(
-                                    order['id'],
-                                    order['number'] ?? '',
-                                    cartItems,
-                                    order['type'],
-                                    order['table'],
-                                  );
-
-                              HomeShell.selectTabByLabel('POS');
-                            },
+                            onPressed: () => _startModifyOrder(context, order, status),
                             icon: const Icon(Icons.edit_rounded, size: 18),
                             label: Text(
-                              'Modify Order',
+                              isCompleted ? 'Modify Completed Order' : 'Modify Order',
                               style: GoogleFonts.poppins(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -2195,92 +2196,94 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      // Pay & Complete Button
-                      Expanded(
-                        child: SizedBox(
-                          height: 48,
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.pop(context);
+                      if (!isCompleted) ...[
+                        const SizedBox(width: 10),
+                        // Pay & Complete Button
+                        Expanded(
+                          child: SizedBox(
+                            height: 48,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(context);
 
-                              parentContext
-                                  .read<OrdersProvider>()
-                                  .fetchBankAccounts();
+                                parentContext
+                                    .read<OrdersProvider>()
+                                    .fetchBankAccounts();
 
-                              showModalBottomSheet(
-                                context: parentContext,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (ctx) => PaymentModal(
-                                  grandTotal: JsonUtils.parseDouble(order['total']),
-                                  selectedCustomer: null,
-                                  onConfirm: (method,
-                                      {int? bankAccountId,
-                                      Map<String, dynamic>? selectedCustomer}) async {
-                                    Navigator.pop(ctx);
+                                showModalBottomSheet(
+                                  context: parentContext,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (ctx) => PaymentModal(
+                                    grandTotal: JsonUtils.parseDouble(order['total']),
+                                    selectedCustomer: null,
+                                    onConfirm: (method,
+                                        {int? bankAccountId,
+                                        Map<String, dynamic>? selectedCustomer}) async {
+                                      Navigator.pop(ctx);
 
-                                    final success = await parentContext
-                                        .read<OrdersProvider>()
-                                        .completeOrder(
-                                          order['id'],
-                                          paymentMethod: method,
-                                          bankAccountId: bankAccountId,
-                                        );
+                                      final success = await parentContext
+                                          .read<OrdersProvider>()
+                                          .completeOrder(
+                                            order['id'],
+                                            paymentMethod: method,
+                                            bankAccountId: bankAccountId,
+                                          );
 
-                                    if (success) {
-                                      if (parentContext.mounted) {
-                                        parentContext
-                                            .read<OrdersProvider>()
-                                            .fetchOrders();
-                                        parentContext
-                                            .read<TablesProvider>()
-                                            .fetchTables();
-                                        showTopSnackBar(
-                                            parentContext,
-                                            SnackBar(
-                                              content: const Text(
-                                                  'Order completed successfully!'),
-                                              backgroundColor: AppColors.statusGreen,
-                                            ));
+                                      if (success) {
+                                        if (parentContext.mounted) {
+                                          parentContext
+                                              .read<OrdersProvider>()
+                                              .fetchOrders();
+                                          parentContext
+                                              .read<TablesProvider>()
+                                              .fetchTables();
+                                          showTopSnackBar(
+                                              parentContext,
+                                              SnackBar(
+                                                content: const Text(
+                                                    'Order completed successfully!'),
+                                                backgroundColor: AppColors.statusGreen,
+                                              ));
+                                        }
+                                      } else {
+                                        if (parentContext.mounted) {
+                                          showTopSnackBar(
+                                              parentContext,
+                                              SnackBar(
+                                                content: const Text(
+                                                    'Failed to complete order'),
+                                                backgroundColor: AppColors.statusRed,
+                                              ));
+                                        }
                                       }
-                                    } else {
-                                      if (parentContext.mounted) {
-                                        showTopSnackBar(
-                                            parentContext,
-                                            SnackBar(
-                                              content: const Text(
-                                                  'Failed to complete order'),
-                                              backgroundColor: AppColors.statusRed,
-                                            ));
-                                      }
-                                    }
-                                  },
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.payment_rounded, size: 18),
-                            label: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                'Pay & Complete',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                                    },
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.payment_rounded, size: 18),
+                              label: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  'Pay & Complete',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2563EB),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                              elevation: 0,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2563EB),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                elevation: 0,
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),

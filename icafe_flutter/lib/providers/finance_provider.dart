@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import '../core/services/api_service.dart';
 
 class FinanceProvider extends ChangeNotifier {
@@ -636,14 +637,26 @@ class FinanceProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> createBankAccount(Map<String, dynamic> data) async {
+  Future<bool> createBankAccount(Map<String, dynamic> data, {XFile? qrImage}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final res = await _apiService.post('/finance/bank-accounts', data);
-      if (res != null && res['success'] == true) {
+      Map<String, dynamic>? res;
+      if (qrImage != null) {
+        final Map<String, String> fields = data.map((key, value) => MapEntry(key, value?.toString() ?? ''));
+        res = await _apiService.postMultipart(
+          '/finance/bank-accounts',
+          fields,
+          qrImage,
+          fileFieldKey: 'qr_code',
+        );
+      } else {
+        res = await _apiService.post('/finance/bank-accounts', data);
+      }
+
+      if (res != null && (res['success'] == true || res['account'] != null)) {
         await fetchBanking();
         return true;
       } else {
@@ -659,14 +672,30 @@ class FinanceProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateBankAccount(int id, Map<String, dynamic> data) async {
+  Future<bool> updateBankAccount(int id, Map<String, dynamic> data, {XFile? qrImage, bool removeQr = false}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final res = await _apiService.put('/finance/bank-accounts/$id', data);
-      if (res != null && res['success'] == true) {
+      Map<String, dynamic>? res;
+      if (qrImage != null || removeQr) {
+        final Map<String, String> fields = data.map((key, value) => MapEntry(key, value?.toString() ?? ''));
+        if (removeQr) {
+          fields['remove_qr'] = '1';
+        }
+        res = await _apiService.postMultipart(
+          '/finance/bank-accounts/$id',
+          fields,
+          qrImage,
+          method: 'POST',
+          fileFieldKey: 'qr_code',
+        );
+      } else {
+        res = await _apiService.put('/finance/bank-accounts/$id', data);
+      }
+
+      if (res != null && (res['success'] == true || res['account'] != null)) {
         await fetchBanking();
         return true;
       } else {

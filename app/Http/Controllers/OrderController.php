@@ -325,7 +325,15 @@ class OrderController extends Controller
     public function edit(\App\Models\Order $order)
     {
         if ($order->status === 'completed') {
-            return redirect()->route('table-book')->with('error', 'Completed orders cannot be modified.');
+            $tenantId = auth()->user()?->tenant_id ?? $order->tenant_id;
+            $allowEdit = \App\Models\Setting::where('tenant_id', $tenantId)
+                ->where('key', 'enable_completed_order_edit')
+                ->value('value');
+            $canEditCompleted = in_array($allowEdit, ['true', '1', true, 1], true);
+
+            if (!$canEditCompleted) {
+                return redirect()->route('orders.index')->with('error', 'Completed orders cannot be modified. You can enable this in Cafe Settings.');
+            }
         }
 
         $order->load([
@@ -500,7 +508,15 @@ class OrderController extends Controller
     public function update(Request $request, \App\Models\Order $order)
     {
         if ($order->status === 'completed') {
-            return back()->with('error', 'Completed orders cannot be modified.');
+            $tenantId = auth()->user()?->tenant_id ?? $order->tenant_id;
+            $allowEdit = \App\Models\Setting::where('tenant_id', $tenantId)
+                ->where('key', 'enable_completed_order_edit')
+                ->value('value');
+            $canEditCompleted = in_array($allowEdit, ['true', '1', true, 1], true);
+
+            if (!$canEditCompleted) {
+                return back()->with('error', 'Completed orders cannot be modified. You can enable this in Cafe Settings.');
+            }
         }
 
         $validated = $request->validate([

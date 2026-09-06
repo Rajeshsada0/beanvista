@@ -75,9 +75,15 @@ class FinanceController extends Controller
             'bank_name' => 'nullable|string|max:255',
             'account_type' => 'required|in:checking,cash,online',
             'balance' => 'required|numeric|min:0',
+            'qr_code' => 'nullable|image|max:3072',
         ]);
 
         $tenantId = auth()->user()->tenant_id ?? 1;
+
+        $qrPath = null;
+        if ($request->hasFile('qr_code')) {
+            $qrPath = $request->file('qr_code')->store("tenants/{$tenantId}/bank_qrs", 'public');
+        }
 
         // Create a GL Account for this bank
         $glAccount = \App\Models\Account::create([
@@ -85,7 +91,7 @@ class FinanceController extends Controller
             'name' => $validated['account_name'] . ' (Bank)',
             'code' => '100' . rand(10, 99), // Simple code generation
             'type' => 'asset',
-            'description' => 'Bank account for ' . $validated['bank_name']
+            'description' => 'Bank account for ' . ($validated['bank_name'] ?? '')
         ]);
 
         BankAccount::create([
@@ -94,6 +100,7 @@ class FinanceController extends Controller
             'account_number' => $validated['account_number'],
             'bank_name' => $validated['bank_name'],
             'account_type' => $validated['account_type'],
+            'qr_code' => $qrPath,
             'gl_account_id' => $glAccount->id,
             'balance' => $validated['balance'],
         ]);
@@ -109,14 +116,31 @@ class FinanceController extends Controller
             'bank_name' => 'nullable|string|max:255',
             'account_type' => 'required|in:checking,cash,online',
             'balance' => 'required|numeric|min:0',
+            'qr_code' => 'nullable|image|max:3072',
+            'remove_qr' => 'nullable|boolean',
         ]);
 
+        $tenantId = auth()->user()->tenant_id ?? $account->tenant_id ?? 1;
+
+        if ($request->hasFile('qr_code')) {
+            if ($account->qr_code && \Illuminate\Support\Facades\Storage::disk('public')->exists($account->qr_code)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($account->qr_code);
+            }
+            $validated['qr_code'] = $request->file('qr_code')->store("tenants/{$tenantId}/bank_qrs", 'public');
+        } elseif ($request->boolean('remove_qr')) {
+            if ($account->qr_code && \Illuminate\Support\Facades\Storage::disk('public')->exists($account->qr_code)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($account->qr_code);
+            }
+            $validated['qr_code'] = null;
+        }
+
+        unset($validated['remove_qr']);
         $account->update($validated);
         
         if ($account->glAccount) {
             $account->glAccount->update([
                 'name' => $validated['account_name'] . ' (Bank)',
-                'description' => 'Bank account for ' . $validated['bank_name']
+                'description' => 'Bank account for ' . ($validated['bank_name'] ?? '')
             ]);
         }
 
@@ -127,6 +151,10 @@ class FinanceController extends Controller
     {
         if ($account->transactions()->exists()) {
             return back()->with('error', 'Cannot delete account with existing transactions.');
+        }
+
+        if ($account->qr_code && \Illuminate\Support\Facades\Storage::disk('public')->exists($account->qr_code)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($account->qr_code);
         }
 
         if ($account->glAccount) {
