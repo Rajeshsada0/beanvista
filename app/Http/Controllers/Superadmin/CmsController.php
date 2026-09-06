@@ -26,8 +26,8 @@ class CmsController extends Controller
             'seo_title' => $settingsRaw->get('seo_title', 'BeanVista POS — Complete Cafe & Restaurant Management Solution'),
             'seo_description' => $settingsRaw->get('seo_description', 'BeanVista POS is a complete cafe and restaurant management system. POS billing, table reservations, KDS, inventory tracking, staff management, and analytics.'),
             'seo_keywords' => $settingsRaw->get('seo_keywords', 'restaurant pos, cafe pos, kitchen display system, inventory tracking, staff management, loyalty rewards'),
-            'site_logo' => $settingsRaw->get('site_logo') ? asset('storage/' . $settingsRaw->get('site_logo')) : null,
-            'site_favicon' => $settingsRaw->get('site_favicon') ? asset('storage/' . $settingsRaw->get('site_favicon')) : null,
+            'site_logo' => Setting::imageUrl($settingsRaw->get('site_logo')),
+            'site_favicon' => Setting::imageUrl($settingsRaw->get('site_favicon')),
             
             'contact_email' => $settingsRaw->get('contact_email', 'support@beanvista.com'),
             'contact_phone' => $settingsRaw->get('contact_phone', '+1-555-0199'),
@@ -117,7 +117,7 @@ class CmsController extends Controller
             $settings["feature_style_$i"] = $settingsRaw->get("feature_style_$i", $defaultFeatures[$i]['style']);
             
             $dbImg = $settingsRaw->get("feature_image_$i");
-            $settings["feature_image_$i"] = $dbImg ? asset('storage/' . $dbImg) : $defaultFeatures[$i]['image'];
+            $settings["feature_image_$i"] = $dbImg ? Setting::imageUrl($dbImg) : $defaultFeatures[$i]['image'];
         }
 
         // Fetch all reviews (latest first)

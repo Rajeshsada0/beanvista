@@ -8,14 +8,19 @@ import {
 
 export default function Index({ settings, reviews }) {
     const [activeTab, setActiveTab] = useState('seo');
-    const [logoPreview, setLogoPreview] = useState(settings.site_logo);
-    const [faviconPreview, setFaviconPreview] = useState(settings.site_favicon);
+    const [logoPreview, setLogoPreview] = useState(
+        settings.site_logo ? (typeof settings.site_logo === 'string' ? settings.site_logo.replace('/storage/', '/img/') : settings.site_logo) : null
+    );
+    const [faviconPreview, setFaviconPreview] = useState(
+        settings.site_favicon ? (typeof settings.site_favicon === 'string' ? settings.site_favicon.replace('/storage/', '/img/') : settings.site_favicon) : null
+    );
     
     // Track previews for the 9 feature images
     const [featurePreviews, setFeaturePreviews] = useState(() => {
         const previews = {};
         for (let i = 1; i <= 9; i++) {
-            previews[`feature_image_${i}`] = settings[`feature_image_${i}`] || null;
+            const val = settings[`feature_image_${i}`];
+            previews[`feature_image_${i}`] = (val && typeof val === 'string') ? val.replace('/storage/', '/img/') : (val || null);
         }
         return previews;
     });
@@ -239,7 +244,16 @@ export default function Index({ settings, reviews }) {
                                         <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Site Logo</label>
                                         <div className="w-40 h-20 rounded-xl border border-dashed border-gray-300 bg-white flex items-center justify-center overflow-hidden relative group transition-all">
                                             {logoPreview ? (
-                                                <img src={logoPreview} className="max-w-full max-h-full object-contain p-2" alt="Logo Preview" />
+                                                <img 
+                                                    src={typeof logoPreview === 'string' ? logoPreview.replace('/storage/', '/img/') : logoPreview} 
+                                                    className="max-w-full max-h-full object-contain p-2" 
+                                                    alt="Logo Preview" 
+                                                    onError={(e) => {
+                                                        if (e.target.src.includes('/storage/')) {
+                                                            e.target.src = e.target.src.replace('/storage/', '/img/');
+                                                        }
+                                                    }}
+                                                />
                                             ) : (
                                                 <ImageIcon className="w-8 h-8 text-gray-300" />
                                             )}
@@ -259,7 +273,16 @@ export default function Index({ settings, reviews }) {
                                         <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Site Favicon</label>
                                         <div className="w-16 h-16 rounded-xl border border-dashed border-gray-300 bg-white flex items-center justify-center overflow-hidden relative group transition-all">
                                             {faviconPreview ? (
-                                                <img src={faviconPreview} className="w-8 h-8 object-contain" alt="Favicon Preview" />
+                                                <img 
+                                                    src={typeof faviconPreview === 'string' ? faviconPreview.replace('/storage/', '/img/') : faviconPreview} 
+                                                    className="w-8 h-8 object-contain" 
+                                                    alt="Favicon Preview" 
+                                                    onError={(e) => {
+                                                        if (e.target.src.includes('/storage/')) {
+                                                            e.target.src = e.target.src.replace('/storage/', '/img/');
+                                                        }
+                                                    }}
+                                                />
                                             ) : (
                                                 <ImageIcon className="w-6 h-6 text-gray-300" />
                                             )}
@@ -603,9 +626,14 @@ export default function Index({ settings, reviews }) {
                                                         {featurePreviews[`feature_image_${idx}`] ? (
                                                             <>
                                                                 <img 
-                                                                    src={featurePreviews[`feature_image_${idx}`]} 
+                                                                    src={typeof featurePreviews[`feature_image_${idx}`] === 'string' ? featurePreviews[`feature_image_${idx}`].replace('/storage/', '/img/') : featurePreviews[`feature_image_${idx}`]} 
                                                                     alt={`Mockup preview ${idx}`} 
                                                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                                    onError={(e) => {
+                                                                        if (e.target.src.includes('/storage/')) {
+                                                                            e.target.src = e.target.src.replace('/storage/', '/img/');
+                                                                        }
+                                                                    }}
                                                                 />
                                                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
                                                                     <Upload className="w-6 h-6 text-white" />

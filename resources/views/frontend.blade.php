@@ -10,8 +10,8 @@
     $seoDesc = $globalSettings->get('seo_description', 'BeanVista POS is a complete cafe and restaurant management system. POS billing, table reservations, KDS, inventory tracking, staff management, and analytics.');
     $seoKeywords = $globalSettings->get('seo_keywords', 'restaurant pos, cafe pos, kitchen display system, inventory tracking, staff management, loyalty rewards');
     
-    $siteLogo = $globalSettings->get('site_logo') ? asset('storage/' . $globalSettings->get('site_logo')) : null;
-    $siteFavicon = $globalSettings->get('site_favicon') ? asset('storage/' . $globalSettings->get('site_favicon')) : null;
+    $siteLogo = \App\Models\Setting::imageUrl($globalSettings->get('site_logo'));
+    $siteFavicon = \App\Models\Setting::imageUrl($globalSettings->get('site_favicon'));
     
     $contactEmail = $globalSettings->get('contact_email', 'hello@cremaos.com');
     $contactPhone = $globalSettings->get('contact_phone', '+1-555-0199');

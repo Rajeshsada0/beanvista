@@ -48,7 +48,12 @@ class SettingController extends Controller
         }
 
         if (auth()->check()) {
-            cache()->forget('settings_tenant_' . auth()->user()->tenant_id);
+            if (auth()->user()->tenant_id) {
+                cache()->forget('settings_tenant_' . auth()->user()->tenant_id);
+            }
+            cache()->forget('settings_global');
+            cache()->forget('global_favicon');
+            cache()->forget('global_cms_settings');
         }
 
         return back()->with('success', 'Settings updated successfully.');

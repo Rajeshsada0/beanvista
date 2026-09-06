@@ -18,8 +18,12 @@ class POSController extends Controller
     public function viewer()
     {
         return Inertia::render('POS/Viewer', [
-            'menus' => Menu::where('status', true)->with('recipes.inventoryItem')->get(),
-            'categories' => Category::where('status', true)->get(),
+            'menus' => Menu::where(function($q) {
+                $q->where('status', true)->orWhere('status', 1)->orWhereNull('status');
+            })->with('recipes.inventoryItem')->get(),
+            'categories' => Category::where(function($q) {
+                $q->where('status', true)->orWhere('status', 1)->orWhereNull('status');
+            })->get(),
             'tables' => Table::with(['activeOrders' => function($q) {
                 $q->where(function($query) {
                     $query->whereNotIn('status', ['completed', 'cancelled'])

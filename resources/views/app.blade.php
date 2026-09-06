@@ -20,15 +20,15 @@
                 $cacheKey = 'settings_tenant_' . $tenantId;
                 $settings = cache()->remember($cacheKey, 60, function() use ($tenantId) {
                     $data = \App\Models\Setting::where('tenant_id', $tenantId)->pluck('value', 'key');
-                    if (isset($data['site_logo']) && $data['site_logo']) { $data['site_logo'] = asset('storage/' . $data['site_logo']); }
-                    if (isset($data['site_favicon']) && $data['site_favicon']) { $data['site_favicon'] = asset('storage/' . $data['site_favicon']); }
+                    if (isset($data['site_logo']) && $data['site_logo']) { $data['site_logo'] = \App\Models\Setting::imageUrl($data['site_logo']); }
+                    if (isset($data['site_favicon']) && $data['site_favicon']) { $data['site_favicon'] = \App\Models\Setting::imageUrl($data['site_favicon']); }
                     return $data;
                 });
             }
 
             $globalFavicon = cache()->remember('global_favicon', 60, function() {
                 $val = \App\Models\Setting::withoutGlobalScopes()->whereNull('tenant_id')->where('key', 'site_favicon')->value('value');
-                return $val ? asset('storage/' . $val) : null;
+                return \App\Models\Setting::imageUrl($val);
             });
             
             $siteName = $settings['site_name'] ?? config('app.name', 'Cafe management system');

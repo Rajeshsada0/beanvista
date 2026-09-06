@@ -45,6 +45,81 @@ export default function MenuIndex({ menus, db_categories = [] }) {
         localStorage.setItem('menusViewMode', viewMode);
     }, [viewMode]);
 
+    // Category tabs scrolling, wheel & drag support
+    const categoryScrollRef = useRef(null);
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(false);
+    const [isDraggingCategory, setIsDraggingCategory] = useState(false);
+    const startCategoryX = useRef(0);
+    const scrollCategoryLeft = useRef(0);
+    const dragCategoryDistance = useRef(0);
+
+    const updateScrollButtons = () => {
+        if (categoryScrollRef.current) {
+            const { scrollLeft, scrollWidth, clientWidth } = categoryScrollRef.current;
+            setCanScrollLeft(scrollLeft > 10);
+            setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 10);
+        }
+    };
+
+    useEffect(() => {
+        updateScrollButtons();
+        window.addEventListener('resize', updateScrollButtons);
+        return () => window.removeEventListener('resize', updateScrollButtons);
+    }, [categories]);
+
+    useEffect(() => {
+        if (categoryScrollRef.current) {
+            const activeBtn = categoryScrollRef.current.querySelector('[data-active="true"]');
+            if (activeBtn) {
+                activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
+        }
+        updateScrollButtons();
+    }, [activeTab]);
+
+    const scrollCategories = (direction) => {
+        if (categoryScrollRef.current) {
+            const scrollAmount = direction === 'left' ? -250 : 250;
+            categoryScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+            setTimeout(updateScrollButtons, 350);
+        }
+    };
+
+    const handleCategoryMouseDown = (e) => {
+        if (!categoryScrollRef.current) return;
+        setIsDraggingCategory(true);
+        startCategoryX.current = e.pageX - categoryScrollRef.current.offsetLeft;
+        scrollCategoryLeft.current = categoryScrollRef.current.scrollLeft;
+        dragCategoryDistance.current = 0;
+    };
+
+    const handleCategoryMouseLeave = () => {
+        setIsDraggingCategory(false);
+    };
+
+    const handleCategoryMouseUp = () => {
+        setIsDraggingCategory(false);
+    };
+
+    const handleCategoryMouseMove = (e) => {
+        if (!isDraggingCategory || !categoryScrollRef.current) return;
+        e.preventDefault();
+        const x = e.pageX - categoryScrollRef.current.offsetLeft;
+        const walk = (x - startCategoryX.current) * 1.5;
+        dragCategoryDistance.current = Math.abs(e.pageX - (startCategoryX.current + categoryScrollRef.current.offsetLeft));
+        categoryScrollRef.current.scrollLeft = scrollCategoryLeft.current - walk;
+        updateScrollButtons();
+    };
+
+    const handleCategoryWheel = (e) => {
+        if (categoryScrollRef.current && e.deltaY !== 0) {
+            e.preventDefault();
+            categoryScrollRef.current.scrollLeft += e.deltaY;
+            updateScrollButtons();
+        }
+    };
+
     const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm({
         name: '',
         description: '',
@@ -277,32 +352,85 @@ export default function MenuIndex({ menus, db_categories = [] }) {
                     </div>
                 </div>
 
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
-                    <div className="flex items-center gap-3 overflow-x-auto pb-2 no-scrollbar flex-1">
-                        <button
-                            onClick={() => { setActiveTab('All'); setPage(1); }}
-                            className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                                activeTab === 'All' ? 'bg-brand-600 text-white shadow-sm' : 'bg-white text-gray-400 hover:bg-brand-50 hover:text-brand-600 border border-gray-100'
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+                    {/* Category Scrollable Tabs */}
+                    <div className="relative flex items-center flex-1 min-w-0">
+                        {canScrollLeft && (
+                            <button
+                                type="button"
+                                onClick={() => scrollCategories('left')}
+                                className="absolute -left-2 z-10 p-1.5 rounded-full bg-white/95 backdrop-blur-md shadow-md border border-gray-200 text-gray-700 hover:text-brand-600 hover:bg-white transition-all active:scale-95"
+                                title="Scroll left"
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                            </button>
+                        )}
+
+                        <div 
+                            ref={categoryScrollRef}
+                            onScroll={updateScrollButtons}
+                            onMouseDown={handleCategoryMouseDown}
+                            onMouseMove={handleCategoryMouseMove}
+                            onMouseUp={handleCategoryMouseUp}
+                            onMouseLeave={handleCategoryMouseLeave}
+                            onWheel={handleCategoryWheel}
+                            className={`flex items-center gap-2.5 overflow-x-auto scroll-smooth py-1 px-1 flex-1 min-w-0 select-none scrollbar-none no-scrollbar ${
+                                isDraggingCategory ? 'cursor-grabbing' : 'cursor-grab'
                             }`}
                         >
-                            All
-                        </button>
-                        {categories.map(cat => (
                             <button
-                                key={cat}
-                                onClick={() => { setActiveTab(cat); setPage(1); }}
-                                className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
-                                    activeTab === cat ? 'bg-brand-600 text-white shadow-sm' : 'bg-white text-gray-400 hover:bg-brand-50 hover:text-brand-600 border border-gray-100'
+                                type="button"
+                                data-active={activeTab === 'All'}
+                                onClick={() => { 
+                                    if (dragCategoryDistance.current > 5) return;
+                                    setActiveTab('All'); 
+                                    setPage(1); 
+                                }}
+                                className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 whitespace-nowrap ${
+                                    activeTab === 'All' 
+                                        ? 'bg-brand-600 text-white shadow-sm' 
+                                        : 'bg-white text-gray-500 hover:bg-brand-50 hover:text-brand-600 border border-gray-200/80 shadow-2xs'
                                 }`}
                             >
-                                {cat}
+                                All
                             </button>
-                        ))}
+                            {categories.map(cat => (
+                                <button
+                                    key={cat}
+                                    type="button"
+                                    data-active={activeTab === cat}
+                                    onClick={() => { 
+                                        if (dragCategoryDistance.current > 5) return;
+                                        setActiveTab(cat); 
+                                        setPage(1); 
+                                    }}
+                                    className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 whitespace-nowrap ${
+                                        activeTab === cat 
+                                            ? 'bg-brand-600 text-white shadow-sm' 
+                                            : 'bg-white text-gray-500 hover:bg-brand-50 hover:text-brand-600 border border-gray-200/80 shadow-2xs'
+                                    }`}
+                                >
+                                    {cat}
+                                </button>
+                            ))}
+                        </div>
+
+                        {canScrollRight && (
+                            <button
+                                type="button"
+                                onClick={() => scrollCategories('right')}
+                                className="absolute -right-2 z-10 p-1.5 rounded-full bg-white/95 backdrop-blur-md shadow-md border border-gray-200 text-gray-700 hover:text-brand-600 hover:bg-white transition-all active:scale-95"
+                                title="Scroll right"
+                            >
+                                <ChevronRight className="w-4 h-4" />
+                            </button>
+                        )}
                     </div>
 
                     {/* View Mode Toggle */}
-                    <div className="flex items-center bg-gray-100/50 p-1.5 rounded-xl border border-gray-100 shrink-0 self-end md:self-center">
+                    <div className="flex items-center bg-gray-100/70 p-1 rounded-xl border border-gray-200/80 shrink-0 self-end md:self-center">
                         <button
+                            type="button"
                             onClick={() => setViewMode('grid')}
                             className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-brand-600 shadow-sm border border-brand-50' : 'text-gray-400 hover:text-gray-600'}`}
                             title="Grid View"
@@ -310,6 +438,7 @@ export default function MenuIndex({ menus, db_categories = [] }) {
                             <LayoutGrid className="w-4 h-4" />
                         </button>
                         <button
+                            type="button"
                             onClick={() => setViewMode('list')}
                             className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-brand-600 shadow-sm border border-brand-50' : 'text-gray-400 hover:text-gray-600'}`}
                             title="List View"

@@ -34,8 +34,12 @@ export default function SettingIndex({ settings }) {
         mail_from_address: settings.mail_from_address || '',
     });
 
-    const [logoPreview, setLogoPreview] = useState(settings.site_logo || null);
-    const [faviconPreview, setFaviconPreview] = useState(settings.site_favicon || null);
+    const [logoPreview, setLogoPreview] = useState(
+        settings.site_logo ? (typeof settings.site_logo === 'string' ? settings.site_logo.replace('/storage/', '/img/') : settings.site_logo) : null
+    );
+    const [faviconPreview, setFaviconPreview] = useState(
+        settings.site_favicon ? (typeof settings.site_favicon === 'string' ? settings.site_favicon.replace('/storage/', '/img/') : settings.site_favicon) : null
+    );
     const [showScrollTop, setShowScrollTop] = useState(false);
 
     useEffect(() => {
@@ -237,7 +241,16 @@ export default function SettingIndex({ settings }) {
                                     <div className="relative group">
                                         <div className="w-full h-40 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center overflow-hidden relative transition-all group-hover:border-brand-400">
                                             {logoPreview ? (
-                                                <img src={logoPreview} className="w-full h-full object-contain p-3" alt="Logo Preview" />
+                                                <img 
+                                                    src={typeof logoPreview === 'string' ? logoPreview.replace('/storage/', '/img/') : logoPreview} 
+                                                    className="w-full h-full object-contain p-3" 
+                                                    alt="Logo Preview" 
+                                                    onError={(e) => {
+                                                        if (e.target.src.includes('/storage/')) {
+                                                            e.target.src = e.target.src.replace('/storage/', '/img/');
+                                                        }
+                                                    }}
+                                                />
                                             ) : (
                                                 <div className="text-center">
                                                     <ImageIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />

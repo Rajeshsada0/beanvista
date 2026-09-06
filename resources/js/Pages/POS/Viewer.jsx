@@ -169,11 +169,33 @@ export default function Viewer({ menus = [], categories = [], tables = [], addon
             }
             return { ...menu, outOfStock };
         }).filter(item => {
-            const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
-            const matchesCategory = activeCategory === 'all' || item.category_id === activeCategory;
+            const matchesSearch = !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase());
+            
+            let matchesCategory = false;
+            if (!activeCategory || activeCategory === 'all') {
+                matchesCategory = true;
+            } else if (item.category_id != null && String(item.category_id) === String(activeCategory)) {
+                matchesCategory = true;
+            } else {
+                // Find category object by ID or name to support legacy/string categories
+                const activeCatObj = categories.find(c => 
+                    String(c.id) === String(activeCategory) || 
+                    c.name?.trim().toLowerCase() === String(activeCategory).trim().toLowerCase()
+                );
+
+                if (activeCatObj) {
+                    const catIdMatch = item.category_id != null && String(item.category_id) === String(activeCatObj.id);
+                    const catNameMatch = item.category && activeCatObj.name && 
+                        item.category.trim().toLowerCase() === activeCatObj.name.trim().toLowerCase();
+                    matchesCategory = catIdMatch || catNameMatch;
+                } else if (item.category && item.category.trim().toLowerCase() === String(activeCategory).trim().toLowerCase()) {
+                    matchesCategory = true;
+                }
+            }
+
             return matchesSearch && matchesCategory;
         });
-    }, [menus, searchQuery, activeCategory]);
+    }, [menus, searchQuery, activeCategory, categories]);
 
     const handleAddToCart = (item) => {
         if (!selectedTableId && orderType === 'Dine-In') {

@@ -32,7 +32,9 @@ export default function Index({
         enable_contact_whatsapp: enable_contact_whatsapp || 'true',
         contact_whatsapp_number: contact_whatsapp_number || '+977-1234567890',
     });
-    const [faviconPreview, setFaviconPreview] = useState(site_favicon || null);
+    const [faviconPreview, setFaviconPreview] = useState(
+        site_favicon ? (typeof site_favicon === 'string' ? site_favicon.replace('/storage/', '/img/') : site_favicon) : null
+    );
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -117,7 +119,16 @@ export default function Index({
                                 <div className="flex items-center space-x-3 h-[50px]">
                                     <div className="w-12 h-12 rounded-xl border border-gray-200 bg-white flex items-center justify-center overflow-hidden relative group transition-all">
                                         {faviconPreview ? (
-                                            <img src={faviconPreview} className="w-6 h-6 object-contain" alt="Favicon Preview" />
+                                            <img 
+                                                src={typeof faviconPreview === 'string' ? faviconPreview.replace('/storage/', '/img/') : faviconPreview} 
+                                                className="w-6 h-6 object-contain" 
+                                                alt="Favicon Preview" 
+                                                onError={(e) => {
+                                                    if (e.target.src.includes('/storage/')) {
+                                                        e.target.src = e.target.src.replace('/storage/', '/img/');
+                                                    }
+                                                }}
+                                            />
                                         ) : (
                                             <ImageIcon className="w-4 h-4 text-gray-400" />
                                         )}

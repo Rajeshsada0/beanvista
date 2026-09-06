@@ -22,13 +22,20 @@ class BranchScope implements Scope
                 return;
             }
 
+            $branchId = session('active_branch_id') ?: $user->primary_branch_id;
+
             // Only scope if the session has an active branch ID or we have auth fallback
-            if (session()->has('active_branch_id')) {
-                // Scopes the query to the active branch
-                $builder->where($model->getTable() . '.branch_id', session('active_branch_id'));
-            } elseif ($user->primary_branch_id) {
-                // Scopes the query to the user's primary branch (API stateless fallback)
-                $builder->where($model->getTable() . '.branch_id', $user->primary_branch_id);
+            if ($branchId) {
+                $table = $model->getTable();
+                // Catalog and configuration data should include global tenant records (where branch_id IS NULL)
+                if (in_array($table, ['menus', 'categories', 'addons', 'taxes', 'tables', 'bank_accounts', 'banners', 'loyalty_rewards'])) {
+                    $builder->where(function ($q) use ($table, $branchId) {
+                        $q->where($table . '.branch_id', $branchId)
+                          ->orWhereNull($table . '.branch_id');
+                    });
+                } else {
+                    $builder->where($table . '.branch_id', $branchId);
+                }
             }
         }
     }

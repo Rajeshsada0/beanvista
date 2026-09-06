@@ -71,7 +71,7 @@ export default function CategoryFilter({ categories, activeCategory, onSelectCat
                         onSelectCategory(category.id);
                     }}
                     className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold transition-all duration-300 ${
-                        activeCategory === category.id
+                        String(activeCategory) === String(category.id) || (typeof activeCategory === 'string' && activeCategory.toLowerCase() === category.name.toLowerCase())
                             ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20'
                             : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                     }`}

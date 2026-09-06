@@ -154,10 +154,10 @@ class HandleInertiaRequests extends Middleware
                         }
 
                         if (isset($settings['site_logo']) && $settings['site_logo']) {
-                            $settings['site_logo'] = asset('storage/' . $settings['site_logo']);
+                            $settings['site_logo'] = \App\Models\Setting::imageUrl($settings['site_logo']);
                         }
                         if (isset($settings['site_favicon']) && $settings['site_favicon']) {
-                            $settings['site_favicon'] = asset('storage/' . $settings['site_favicon']);
+                            $settings['site_favicon'] = \App\Models\Setting::imageUrl($settings['site_favicon']);
                         }
                         return $settings;
                     });
@@ -179,12 +179,12 @@ class HandleInertiaRequests extends Middleware
                     // Always expose tenant_name so JS can distinguish it from the custom site_name
                     $settings['tenant_name'] = $tenantName;
 
-                    // Ensure image paths are absolute URLs using asset()
+                    // Ensure image paths use /img/ route via Setting::imageUrl
                     if (isset($settings['site_logo']) && $settings['site_logo']) {
-                        $settings['site_logo'] = asset('storage/' . $settings['site_logo']);
+                        $settings['site_logo'] = \App\Models\Setting::imageUrl($settings['site_logo']);
                     }
                     if (isset($settings['site_favicon']) && $settings['site_favicon']) {
-                        $settings['site_favicon'] = asset('storage/' . $settings['site_favicon']);
+                        $settings['site_favicon'] = \App\Models\Setting::imageUrl($settings['site_favicon']);
                     }
                     return $settings;
                 });

@@ -266,11 +266,7 @@ class ApiController extends Controller
             'contact_whatsapp_number' => Setting::withoutGlobalScopes()->whereNull('tenant_id')->where('key', 'contact_whatsapp_number')->value('value') ?? '',
         ];
 
-        if (!empty($settings['site_favicon'])) {
-            $settings['site_favicon_url'] = url('storage/' . $settings['site_favicon']);
-        } else {
-            $settings['site_favicon_url'] = null;
-        }
+        $settings['site_favicon_url'] = Setting::imageUrl($settings['site_favicon'] ?? null);
 
         return response()->json([
             'success' => true,
@@ -2014,17 +2010,8 @@ class ApiController extends Controller
             }
         }
 
-        if (!empty($settings['site_logo'])) {
-            $settings['site_logo_url'] = url('storage/' . $settings['site_logo']);
-        } else {
-            $settings['site_logo_url'] = null;
-        }
-
-        if (!empty($settings['site_favicon'])) {
-            $settings['site_favicon_url'] = url('storage/' . $settings['site_favicon']);
-        } else {
-            $settings['site_favicon_url'] = null;
-        }
+        $settings['site_logo_url'] = Setting::imageUrl($settings['site_logo'] ?? null);
+        $settings['site_favicon_url'] = Setting::imageUrl($settings['site_favicon'] ?? null);
 
         return response()->json([
             'success' => true,
