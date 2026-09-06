@@ -23,12 +23,32 @@ import {
     Timer,
     X,
     Lock,
-    Unlock
+    Unlock,
+    MinusCircle,
+    PlusCircle,
+    Receipt,
+    Plus,
+    Tag
 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import Modal from '@/Components/Modal';
 
-export default function Dashboard({ stats, recent_activity, weekly_sales, filters, top_selling, low_stock, activeSession, cashSales, cashDeposits, cashWithdrawals }) {
+export default function Dashboard({ 
+    stats, 
+    recent_activity, 
+    weekly_sales, 
+    filters, 
+    top_selling, 
+    low_stock, 
+    activeSession, 
+    cashSales = 0, 
+    cashDeposits = 0, 
+    cashWithdrawals = 0,
+    counterExpenses = 0,
+    counterCashIn = 0,
+    todayCounterExpenses = [],
+    expenseCategories = []
+}) {
     const { auth, settings, trial } = usePage().props;
     const currency = settings?.currency_symbol || 'रू.';
     const siteName = settings?.site_name || 'CaféOS';
@@ -40,6 +60,7 @@ export default function Dashboard({ stats, recent_activity, weekly_sales, filter
     });
 
     const [showRegisterModal, setShowRegisterModal] = useState(false);
+    const [showCashExpenseModal, setShowCashExpenseModal] = useState(false);
 
     // Form for opening register
     const openForm = useForm({
@@ -53,10 +74,45 @@ export default function Dashboard({ stats, recent_activity, weekly_sales, filter
         notes: '',
     });
 
+    // Form for counter cash expense / float
+    const cashExpenseForm = useForm({
+        type: 'cash_out',
+        amount: '',
+        notes: '',
+        expense_category_id: ''
+    });
+
+    const handleOpenExpenseModal = (type = 'cash_out') => {
+        cashExpenseForm.setData({
+            type: type,
+            amount: '',
+            notes: '',
+            expense_category_id: ''
+        });
+        cashExpenseForm.clearErrors();
+        setShowCashExpenseModal(true);
+    };
+
+    const submitCashExpense = (e) => {
+        e.preventDefault();
+        cashExpenseForm.post(route('finance.cash-counter.transaction.store'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                cashExpenseForm.reset();
+                setShowCashExpenseModal(false);
+            }
+        });
+    };
+
     const expectedBalance = useMemo(() => {
         if (!activeSession) return 0;
-        return parseFloat(activeSession.opening_balance || 0) + parseFloat(cashSales || 0) + parseFloat(cashDeposits || 0) - parseFloat(cashWithdrawals || 0);
-    }, [activeSession, cashSales, cashDeposits, cashWithdrawals]);
+        return parseFloat(activeSession.opening_balance || 0) 
+            + parseFloat(cashSales || 0) 
+            + parseFloat(cashDeposits || 0) 
+            - parseFloat(cashWithdrawals || 0)
+            - parseFloat(counterExpenses || 0)
+            + parseFloat(counterCashIn || 0);
+    }, [activeSession, cashSales, cashDeposits, cashWithdrawals, counterExpenses, counterCashIn]);
 
     useEffect(() => {
         if (activeSession) {
@@ -306,6 +362,27 @@ export default function Dashboard({ stats, recent_activity, weekly_sales, filter
                                     <span>Cash Counter: {activeSession ? 'Open' : 'Closed'}</span>
                                 </button>
                             )}
+                            {auth.user.role !== 'waiter' && (
+                                <button 
+                                    type="button"
+                                    onClick={() => {
+                                        if (!activeSession) {
+                                            setShowRegisterModal(true);
+                                        } else {
+                                            handleOpenExpenseModal('cash_out');
+                                        }
+                                    }}
+                                    className={`flex-1 sm:flex-none border font-bold py-2.5 px-3.5 rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 text-xs ${
+                                        activeSession 
+                                            ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100 hover:border-rose-300' 
+                                            : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+                                    }`}
+                                    title={activeSession ? "Record petty cash expense from drawer (e.g. lemon, sugar, lighter)" : "Open cash register to record drawer expenses"}
+                                >
+                                    <MinusCircle className={`w-3.5 h-3.5 ${activeSession ? 'text-rose-600' : 'text-slate-400'}`} />
+                                    <span>+ Cash Expense</span>
+                                </button>
+                            )}
                             <Link href={route('table-book')}
                                 className="flex-1 sm:flex-none bg-white border border-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl shadow-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 text-xs">
                                 <LayoutGrid className="w-3.5 h-3.5 text-slate-500" />
@@ -489,7 +566,7 @@ export default function Dashboard({ stats, recent_activity, weekly_sales, filter
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     {/* Top Selling Products */}
                     <div className="bg-white border border-slate-100 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.015)] flex flex-col hover:shadow-md hover:border-slate-200/85 transition-all duration-300">
                         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
@@ -610,6 +687,112 @@ export default function Dashboard({ stats, recent_activity, weekly_sales, filter
                             </Deferred>
                         </div>
                     </div>
+
+                    {/* Daily Counter Cash Expenses & Daily Uses */}
+                    <div className="bg-white border border-slate-100 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.015)] flex flex-col hover:shadow-md hover:border-slate-200/85 transition-all duration-300">
+                        <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+                            <div>
+                                <h2 className="text-sm font-extrabold text-slate-800">Daily Cash Expenses</h2>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Counter drawer uses (lemon, lighter, etc.)</p>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <span className="inline-flex px-2 py-0.5 bg-rose-50 text-rose-700 text-[10px] font-extrabold rounded-full border border-rose-100">
+                                    {formatCurrency(stats.today_cash_expenses || 0)}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (!activeSession) {
+                                            setShowRegisterModal(true);
+                                        } else {
+                                            handleOpenExpenseModal('cash_out');
+                                        }
+                                    }}
+                                    className="p-1 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                                    title="Quick Cash Out"
+                                >
+                                    <Plus size={13} />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex-1 p-4 flex flex-col justify-between">
+                            {todayCounterExpenses.length === 0 ? (
+                                <div className="h-full flex flex-col items-center justify-center text-center py-10 text-slate-500">
+                                    <div className="w-11 h-11 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-2.5 border border-rose-100">
+                                        <Receipt className="w-5 h-5" />
+                                    </div>
+                                    <h4 className="text-xs font-bold text-slate-800">No Counter Expenses</h4>
+                                    <p className="text-[10px] text-slate-400 mt-0.5 max-w-[200px]">
+                                        No cash taken from drawer today for petty supplies.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!activeSession) {
+                                                setShowRegisterModal(true);
+                                            } else {
+                                                handleOpenExpenseModal('cash_out');
+                                            }
+                                        }}
+                                        className="mt-3 inline-flex items-center gap-1 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs border border-rose-200 transition-colors"
+                                    >
+                                        <Plus size={12} /> Record Cash Out
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="space-y-2 overflow-y-auto max-h-[260px] pr-1">
+                                    {todayCounterExpenses.map((txn) => (
+                                        <div key={txn.id} className="flex items-center justify-between p-2 hover:bg-slate-50/70 border border-slate-100/60 rounded-xl transition-all">
+                                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-100">
+                                                    <MinusCircle size={14} />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <h4 className="text-xs font-bold text-slate-800 truncate" title={txn.notes}>
+                                                        {txn.notes}
+                                                    </h4>
+                                                    <div className="flex items-center gap-1.5 mt-0.5 text-[9px] text-slate-400 font-medium">
+                                                        <span>{txn.user?.name || 'Staff'}</span>
+                                                        <span>•</span>
+                                                        <span>{new Date(txn.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="text-right pl-2 shrink-0">
+                                                <span className="text-xs font-black text-rose-600">
+                                                    -{formatCurrency(txn.amount)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                                <Link
+                                    href={route('finance.cash-counter')}
+                                    className="text-[10px] font-bold text-slate-500 hover:text-brand-600 flex items-center gap-1 transition-colors"
+                                >
+                                    <span>Cash Counter</span>
+                                    <ChevronRight size={12} />
+                                </Link>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (!activeSession) {
+                                            setShowRegisterModal(true);
+                                        } else {
+                                            handleOpenExpenseModal('cash_out');
+                                        }
+                                    }}
+                                    className="text-[10px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 transition-colors"
+                                >
+                                    <Plus size={12} />
+                                    <span>+ Cash Out</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -649,6 +832,12 @@ export default function Dashboard({ stats, recent_activity, weekly_sales, filter
                                     <span>+ Cash Sales</span>
                                     <span>+{formatCurrency(cashSales)}</span>
                                 </div>
+                                {counterCashIn > 0 && (
+                                    <div className="flex justify-between text-xs font-medium text-emerald-600">
+                                        <span>+ Counter Cash In</span>
+                                        <span>+{formatCurrency(counterCashIn)}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between text-xs font-medium text-blue-600">
                                     <span>+ Cash Deposits</span>
                                     <span>+{formatCurrency(cashDeposits)}</span>
@@ -656,6 +845,10 @@ export default function Dashboard({ stats, recent_activity, weekly_sales, filter
                                 <div className="flex justify-between text-xs font-medium text-amber-600">
                                     <span>- Cash Withdrawals</span>
                                     <span>-{formatCurrency(cashWithdrawals)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs font-medium text-rose-600">
+                                    <span>- Counter Cash Out / Expenses</span>
+                                    <span>-{formatCurrency(counterExpenses)}</span>
                                 </div>
                                 <div className="h-px bg-gray-200 my-1"></div>
                                 <div className="flex justify-between text-sm font-black text-gray-900">
@@ -818,6 +1011,185 @@ export default function Dashboard({ stats, recent_activity, weekly_sales, filter
                         </div>
                     </form>
                 )}
+            </Modal>
+
+            {/* Quick Cash Expense / Counter Uses Modal */}
+            <Modal show={showCashExpenseModal} onClose={() => setShowCashExpenseModal(false)} maxWidth="md">
+                <form onSubmit={submitCashExpense} className="p-6">
+                    <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                        <div className="flex items-center gap-2.5">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                                cashExpenseForm.data.type === 'cash_out' ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-600'
+                            }`}>
+                                {cashExpenseForm.data.type === 'cash_out' ? <MinusCircle size={20} /> : <PlusCircle size={20} />}
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-900">
+                                    {cashExpenseForm.data.type === 'cash_out' ? 'Daily Counter Cash Expense' : 'Add Cash In / Float'}
+                                </h3>
+                                <p className="text-xs text-slate-500">
+                                    {cashExpenseForm.data.type === 'cash_out' 
+                                        ? 'Record cash taken from counter for daily supplies (lemon, sugar, lighter, etc.)' 
+                                        : 'Add additional cash float into the register drawer'}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowCashExpenseModal(false)}
+                            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+
+                    <div className="space-y-4">
+                        {/* Type toggle */}
+                        <div className="flex rounded-xl bg-slate-100 p-1">
+                            <button
+                                type="button"
+                                onClick={() => cashExpenseForm.setData('type', 'cash_out')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${
+                                    cashExpenseForm.data.type === 'cash_out'
+                                        ? 'bg-rose-600 text-white shadow-sm'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <MinusCircle size={14} /> Cash Out (Expense / Daily Uses)
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => cashExpenseForm.setData('type', 'cash_in')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${
+                                    cashExpenseForm.data.type === 'cash_in'
+                                        ? 'bg-emerald-600 text-white shadow-sm'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <PlusCircle size={14} /> Cash In (Add Float)
+                            </button>
+                        </div>
+
+                        {/* Amount */}
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Amount ({currency}) <span className="text-rose-500">*</span>
+                            </label>
+                            <div className="relative">
+                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">
+                                    {currency}
+                                </span>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    required
+                                    autoFocus
+                                    placeholder="0.00"
+                                    value={cashExpenseForm.data.amount}
+                                    onChange={e => cashExpenseForm.setData('amount', e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-slate-900 font-bold text-lg"
+                                />
+                            </div>
+                            {cashExpenseForm.errors.amount && (
+                                <p className="mt-1 text-xs text-rose-500 font-medium">{cashExpenseForm.errors.amount}</p>
+                            )}
+                        </div>
+
+                        {/* Quick Preset Buttons */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[11px] font-semibold text-slate-400 mr-1">Quick:</span>
+                            {[10, 20, 50, 100, 200, 500].map(amt => (
+                                <button
+                                    key={amt}
+                                    type="button"
+                                    onClick={() => cashExpenseForm.setData('amount', amt.toString())}
+                                    className="px-2.5 py-1 text-xs font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                                >
+                                    +{amt}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Reason / Notes */}
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Reason / Note <span className="text-rose-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                required
+                                placeholder={cashExpenseForm.data.type === 'cash_out' ? "e.g. Lemon, sugar, lighter, cleaning cloth" : "e.g. Added change from bank, extra small change float"}
+                                value={cashExpenseForm.data.notes}
+                                onChange={e => cashExpenseForm.setData('notes', e.target.value)}
+                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-slate-900 text-sm font-medium"
+                            />
+                            {cashExpenseForm.errors.notes && (
+                                <p className="mt-1 text-xs text-rose-500 font-medium">{cashExpenseForm.errors.notes}</p>
+                            )}
+
+                            {/* Suggestion chips */}
+                            {cashExpenseForm.data.type === 'cash_out' && (
+                                <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[11px] font-semibold text-slate-400 mr-0.5">Quick picks:</span>
+                                    {['Lemon & sugar', 'Lighter / matches', 'Milk emergency', 'Drinking water bottle', 'Kitchen cleaning items', 'Ice bag', 'Packaging bags'].map(tag => (
+                                        <button
+                                            key={tag}
+                                            type="button"
+                                            onClick={() => {
+                                                const current = cashExpenseForm.data.notes;
+                                                cashExpenseForm.setData('notes', current ? `${current}, ${tag}` : tag);
+                                            }}
+                                            className="px-2 py-0.5 text-[11px] font-medium rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors"
+                                        >
+                                            + {tag}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Category (Optional) */}
+                        {cashExpenseForm.data.type === 'cash_out' && expenseCategories.length > 0 && (
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                    Expense Category <span className="text-slate-400 font-normal">(optional)</span>
+                                </label>
+                                <select
+                                    value={cashExpenseForm.data.expense_category_id}
+                                    onChange={e => cashExpenseForm.setData('expense_category_id', e.target.value)}
+                                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-slate-700 text-sm font-medium"
+                                >
+                                    <option value="">General Daily Counter Expense</option>
+                                    {expenseCategories.map(cat => (
+                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={() => setShowCashExpenseModal(false)}
+                            className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={cashExpenseForm.processing}
+                            className={`px-5 py-2 text-sm font-bold text-white rounded-xl shadow-sm transition-all flex items-center gap-2 ${
+                                cashExpenseForm.data.type === 'cash_out'
+                                    ? 'bg-rose-600 hover:bg-rose-700 disabled:bg-rose-400'
+                                    : 'bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400'
+                            }`}
+                        >
+                            {cashExpenseForm.processing ? 'Saving...' : cashExpenseForm.data.type === 'cash_out' ? 'Record Cash Out' : 'Save Cash In'}
+                        </button>
+                    </div>
+                </form>
             </Modal>
         </AuthenticatedLayout>
     );

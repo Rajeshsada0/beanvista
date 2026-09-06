@@ -158,6 +158,8 @@ class DashboardController extends Controller
         $cashSales = 0;
         $cashDeposits = 0;
         $cashWithdrawals = 0;
+        $counterExpenses = 0;
+        $counterCashIn = 0;
 
         if ($activeSession) {
             // Find all cash orders completed after opened_at
@@ -166,6 +168,19 @@ class DashboardController extends Controller
                 ->where('payment_method', 'cash')
                 ->where('created_at', '>=', $activeSession->opened_at)
                 ->sum('grand_total');
+
+            $counterExpenses = 0;
+            $counterCashIn = 0;
+
+            if (class_exists(\App\Models\CashRegisterTransaction::class) && \Illuminate\Support\Facades\Schema::hasTable('cash_register_transactions')) {
+                $counterExpenses = \App\Models\CashRegisterTransaction::where('cash_register_session_id', $activeSession->id)
+                    ->where('type', 'cash_out')
+                    ->sum('amount');
+
+                $counterCashIn = \App\Models\CashRegisterTransaction::where('cash_register_session_id', $activeSession->id)
+                    ->where('type', 'cash_in')
+                    ->sum('amount');
+            }
 
             // Find all cash drawer transactions (deposits/withdrawals) after opened_at
             $cashDrawerIds = \App\Models\BankAccount::where('tenant_id', $tenantId)
@@ -185,6 +200,27 @@ class DashboardController extends Controller
             }
         }
 
+        // Today's counter cash out / expenses
+        $todayCashExpenses = 0;
+        $todayCounterExpenses = collect();
+
+        if (class_exists(\App\Models\CashRegisterTransaction::class) && \Illuminate\Support\Facades\Schema::hasTable('cash_register_transactions')) {
+            $todayCashExpenses = \App\Models\CashRegisterTransaction::where('tenant_id', $tenantId)
+                ->whereDate('created_at', $today)
+                ->where('type', 'cash_out')
+                ->sum('amount');
+
+            $todayCounterExpenses = \App\Models\CashRegisterTransaction::where('tenant_id', $tenantId)
+                ->whereDate('created_at', $today)
+                ->where('type', 'cash_out')
+                ->with(['user:id,name', 'category:id,name'])
+                ->latest()
+                ->take(10)
+                ->get();
+        }
+
+        $expenseCategories = \App\Models\ExpenseCategory::all(['id', 'name']);
+
         return Inertia::render('Dashboard', [
             'stats' => [
                 'total_items' => $totalItems,
@@ -193,6 +229,7 @@ class DashboardController extends Controller
                 'today_sales' => (float)$todaySales,
                 'today_cash' => (float)$todayCash,
                 'today_online' => (float)$todayOnline,
+                'today_cash_expenses' => (float)$todayCashExpenses,
                 'yesterday_sales' => (float)$yesterdaySales,
                 'monthly_sales' => (float)$monthlySales,
                 'total_sales' => (float)$totalSales,
@@ -211,6 +248,10 @@ class DashboardController extends Controller
             'cashSales' => (float)$cashSales,
             'cashDeposits' => (float)$cashDeposits,
             'cashWithdrawals' => (float)$cashWithdrawals,
+            'counterExpenses' => (float)$counterExpenses,
+            'counterCashIn' => (float)$counterCashIn,
+            'todayCounterExpenses' => $todayCounterExpenses,
+            'expenseCategories' => $expenseCategories,
         ]);
     }
 }

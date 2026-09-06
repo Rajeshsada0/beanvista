@@ -41,4 +41,19 @@ class CashRegisterSession extends Model
     {
         return $this->belongsTo(User::class, 'closed_by');
     }
+
+    public function transactions()
+    {
+        return $this->hasMany(CashRegisterTransaction::class, 'cash_register_session_id')->orderBy('created_at', 'desc');
+    }
+
+    public function cashOutTransactions()
+    {
+        return $this->hasMany(CashRegisterTransaction::class, 'cash_register_session_id')->where('type', 'cash_out');
+    }
+
+    public function cashInTransactions()
+    {
+        return $this->hasMany(CashRegisterTransaction::class, 'cash_register_session_id')->where('type', 'cash_in');
+    }
 }

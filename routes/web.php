@@ -227,6 +227,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('role:admin,staff,cashier')->group(function () {
         Route::post('/finance/cash-counter/open', [\App\Http\Controllers\FinanceController::class, 'openCashCounter'])->name('finance.cash-counter.open');
         Route::post('/finance/cash-counter/{session}/close', [\App\Http\Controllers\FinanceController::class, 'closeCashCounter'])->name('finance.cash-counter.close');
+        Route::post('/finance/cash-counter/transaction', [\App\Http\Controllers\FinanceController::class, 'storeCashCounterTransaction'])->name('finance.cash-counter.transaction.store');
+        Route::delete('/finance/cash-counter/transaction/{transaction}', [\App\Http\Controllers\FinanceController::class, 'destroyCashCounterTransaction'])->name('finance.cash-counter.transaction.destroy');
     });
 
     // Staff, Cashier, Waiter & Admin Routes

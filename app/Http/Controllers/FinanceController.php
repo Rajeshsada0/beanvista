@@ -829,11 +829,16 @@ class FinanceController extends Controller
 
         $activeSession = \App\Models\CashRegisterSession::where('tenant_id', $tenantId)
             ->where('status', 'open')
+            ->with(['transactions' => function($q) {
+                $q->with(['user', 'category'])->orderBy('created_at', 'desc');
+            }])
             ->first();
 
         $cashSales = 0;
         $cashDeposits = 0;
         $cashWithdrawals = 0;
+        $counterExpenses = 0;
+        $counterCashIn = 0;
 
         if ($activeSession) {
             // Find all cash orders completed after opened_at
@@ -842,6 +847,14 @@ class FinanceController extends Controller
                 ->where('payment_method', 'cash')
                 ->where('created_at', '>=', $activeSession->opened_at)
                 ->sum('grand_total');
+
+            // Find all counter transactions (cash-out expenses and cash-in)
+            $counterExpenses = 0;
+            $counterCashIn = 0;
+            if (class_exists(\App\Models\CashRegisterTransaction::class) && \Illuminate\Support\Facades\Schema::hasTable('cash_register_transactions')) {
+                $counterExpenses = $activeSession->transactions ? $activeSession->transactions->where('type', 'cash_out')->sum('amount') : 0;
+                $counterCashIn = $activeSession->transactions ? $activeSession->transactions->where('type', 'cash_in')->sum('amount') : 0;
+            }
 
             // Find all cash drawer transactions (deposits/withdrawals) after opened_at
             $cashDrawerIds = \App\Models\BankAccount::where('tenant_id', $tenantId)
@@ -861,9 +874,20 @@ class FinanceController extends Controller
             }
         }
 
-        $previousSessions = \App\Models\CashRegisterSession::where('tenant_id', $tenantId)
-            ->with(['user', 'closedBy'])
+        $expenseCategories = \App\Models\ExpenseCategory::all(['id', 'name']);
+
+        $previousSessionsQuery = \App\Models\CashRegisterSession::where('tenant_id', $tenantId)
+            ->with(['user', 'closedBy']);
+
+        if (class_exists(\App\Models\CashRegisterTransaction::class) && \Illuminate\Support\Facades\Schema::hasTable('cash_register_transactions')) {
+            $previousSessionsQuery->with(['transactions' => function($q) {
+                $q->with('user')->orderBy('created_at', 'desc');
+            }]);
+        }
+
+        $previousSessions = $previousSessionsQuery
             ->orderBy('opened_at', 'desc')
+            ->take(20)
             ->get();
 
         return Inertia::render('Finance/CashCounter', [
@@ -871,6 +895,9 @@ class FinanceController extends Controller
             'cashSales' => (float)$cashSales,
             'cashDeposits' => (float)$cashDeposits,
             'cashWithdrawals' => (float)$cashWithdrawals,
+            'counterExpenses' => (float)$counterExpenses,
+            'counterCashIn' => (float)$counterCashIn,
+            'expenseCategories' => $expenseCategories,
             'previousSessions' => $previousSessions,
         ]);
     }
@@ -934,6 +961,9 @@ class FinanceController extends Controller
             ->where('created_at', '>=', $session->opened_at)
             ->sum('grand_total');
 
+        $counterExpenses = $session->cashOutTransactions()->sum('amount');
+        $counterCashIn = $session->cashInTransactions()->sum('amount');
+
         $cashDeposits = 0;
         $cashWithdrawals = 0;
         $cashDrawerIds = \App\Models\BankAccount::where('tenant_id', $tenantId)
@@ -952,7 +982,7 @@ class FinanceController extends Controller
                 ->sum('amount');
         }
 
-        $expectedBalance = $session->opening_balance + $cashSales + $cashDeposits - $cashWithdrawals;
+        $expectedBalance = $session->opening_balance + $cashSales + $cashDeposits + $counterCashIn - $cashWithdrawals - $counterExpenses;
         $closingBalance = $request->closing_balance;
         $discrepancy = $closingBalance - $expectedBalance;
 
@@ -1026,5 +1056,143 @@ class FinanceController extends Controller
         \App\Models\ActivityLog::record('register_closed', "Closed cash register session. Expected: " . number_format($expectedBalance, 2) . ", Actual: " . number_format($closingBalance, 2) . ", Discrepancy: " . number_format($discrepancy, 2), $session);
 
         return back()->with('success', 'Cash register session closed and reconciled.');
+    }
+
+    public function storeCashCounterTransaction(Request $request)
+    {
+        if (auth()->user()->role === 'waiter') {
+            return back()->with('error', 'Waiters are not authorized to perform drawer transactions.');
+        }
+
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:0.01',
+            'notes' => 'required|string|max:500',
+            'type' => 'required|in:cash_out,cash_in',
+            'expense_category_id' => 'nullable|exists:expense_categories,id',
+        ]);
+
+        $tenantId = auth()->user()->tenant_id;
+        $activeSession = \App\Models\CashRegisterSession::where('tenant_id', $tenantId)
+            ->where('status', 'open')
+            ->first();
+
+        if (!$activeSession) {
+            return back()->with('error', 'No cash register session is currently open. Please open the cash register first.');
+        }
+
+        DB::transaction(function () use ($validated, $activeSession, $tenantId) {
+            $expenseId = null;
+
+            if ($validated['type'] === 'cash_out') {
+                // Determine expense category (fallback to General Expenses if not selected)
+                $categoryId = $validated['expense_category_id'] ?? null;
+                if (!$categoryId) {
+                    $generalExpenseAccount = \App\Models\Account::firstOrCreate(
+                        ['tenant_id' => $tenantId, 'code' => '6004'],
+                        ['name' => 'General Expenses', 'type' => 'expense', 'description' => 'Default general expenses account']
+                    );
+
+                    $defaultCat = \App\Models\ExpenseCategory::firstOrCreate(
+                        ['name' => 'General Expense'],
+                        ['account_id' => $generalExpenseAccount->id]
+                    );
+                    $categoryId = $defaultCat->id;
+                }
+
+                // Find cash payment method if exists
+                $cashPaymentMethod = \App\Models\PaymentMethod::where('type', 'cash')->first();
+
+                $branchId = $activeSession->branch_id ?? (session('active_branch_id') ?: auth()->user()->primary_branch_id);
+
+                // Create Expense record
+                $expense = \App\Models\Expense::create([
+                    'tenant_id' => $tenantId,
+                    'branch_id' => $branchId,
+                    'expense_category_id' => $categoryId,
+                    'amount' => $validated['amount'],
+                    'date' => now()->toDateString(),
+                    'payment_method_id' => $cashPaymentMethod?->id,
+                    'reference' => 'REG-' . $activeSession->id,
+                    'notes' => 'Counter Cash: ' . $validated['notes'],
+                ]);
+                $expenseId = $expense->id;
+
+                // Create Journal Entry
+                $category = \App\Models\ExpenseCategory::find($categoryId);
+                $cashAccount = \App\Models\Account::where('tenant_id', $tenantId)->where('code', '1001')->first();
+                if ($cashAccount && $category && $category->account_id) {
+                    $journalEntry = \App\Models\JournalEntry::create([
+                        'tenant_id' => $tenantId,
+                        'branch_id' => $branchId,
+                        'reference_number' => 'EXP-REG-' . $expense->id,
+                        'date' => now()->toDateString(),
+                        'description' => 'Counter Cash Expense: ' . $category->name . ' - ' . $validated['notes'],
+                        'status' => 'posted',
+                    ]);
+
+                    $journalEntry->lines()->create([
+                        'account_id' => $category->account_id,
+                        'debit' => $validated['amount'],
+                        'credit' => 0,
+                        'description' => 'Counter Cash Expense: ' . $validated['notes'],
+                    ]);
+
+                    $journalEntry->lines()->create([
+                        'account_id' => $cashAccount->id,
+                        'debit' => 0,
+                        'credit' => $validated['amount'],
+                        'description' => 'Cash Drawer Payout: ' . $validated['notes'],
+                    ]);
+                }
+            }
+
+            $branchId = $activeSession->branch_id ?? (session('active_branch_id') ?: auth()->user()->primary_branch_id);
+
+            $transaction = \App\Models\CashRegisterTransaction::create([
+                'tenant_id' => $tenantId,
+                'branch_id' => $branchId,
+                'cash_register_session_id' => $activeSession->id,
+                'user_id' => auth()->id(),
+                'type' => $validated['type'],
+                'amount' => $validated['amount'],
+                'notes' => $validated['notes'],
+                'expense_category_id' => $validated['expense_category_id'] ?? null,
+                'expense_id' => $expenseId,
+            ]);
+
+            $actionText = $validated['type'] === 'cash_out' ? 'Cash Out / Expense' : 'Cash In / Float Top-up';
+            \App\Models\ActivityLog::record(
+                'register_transaction',
+                "{$actionText} of " . number_format($validated['amount'], 2) . ": {$validated['notes']}",
+                $transaction
+            );
+        });
+
+        $msg = $validated['type'] === 'cash_out' 
+            ? 'Cash expense recorded from counter successfully.' 
+            : 'Cash float added to counter successfully.';
+        return back()->with('success', $msg);
+    }
+
+    public function destroyCashCounterTransaction(\App\Models\CashRegisterTransaction $transaction)
+    {
+        if (auth()->user()->role === 'waiter') {
+            return back()->with('error', 'Waiters are not authorized to delete drawer transactions.');
+        }
+
+        if ($transaction->session && $transaction->session->status !== 'open') {
+            return back()->with('error', 'Cannot delete a transaction from a closed register session.');
+        }
+
+        DB::transaction(function () use ($transaction) {
+            if ($transaction->expense) {
+                // Delete associated journal entry if exists
+                \App\Models\JournalEntry::where('reference_number', 'EXP-REG-' . $transaction->expense->id)->delete();
+                $transaction->expense->delete();
+            }
+            $transaction->delete();
+        });
+
+        return back()->with('success', 'Counter transaction deleted successfully.');
     }
 }
