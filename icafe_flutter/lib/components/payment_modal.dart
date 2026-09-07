@@ -645,8 +645,9 @@ class _PaymentModalState extends State<PaymentModal>
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _showFullQrDialog(BankAccountItem account) {
     showDialog(

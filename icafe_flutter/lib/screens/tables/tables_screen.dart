@@ -11,7 +11,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../providers/tables_provider.dart';
 import '../../providers/orders_provider.dart';
 import '../../providers/app_provider.dart';
-import '../../components/payment_modal.dart';
 import '../../components/order_view_sheet.dart';
 import '../home_shell.dart';
 
