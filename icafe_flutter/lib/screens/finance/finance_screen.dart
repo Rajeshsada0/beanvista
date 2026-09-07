@@ -1170,9 +1170,12 @@ class _CashCounterTab extends StatelessWidget {
     final sales = JsonUtils.parseDouble(reg['cashSales']);
     final deposits = JsonUtils.parseDouble(reg['cashDeposits']);
     final withdrawals = JsonUtils.parseDouble(reg['cashWithdrawals']);
-    final expected = openBal + sales + deposits - withdrawals;
+    final counterExpenses = JsonUtils.parseDouble(reg['counterExpenses']);
+    final counterCashIn = JsonUtils.parseDouble(reg['counterCashIn']);
+    final expected = openBal + sales + deposits + counterCashIn - withdrawals - counterExpenses;
 
     final List<dynamic> previousSessions = reg['previousSessions'] is List ? reg['previousSessions'] : [];
+    final List<dynamic> todayTxns = provider.todayCounterExpenses;
 
     return provider.isLoading && reg.isEmpty
         ? Center(child: CircularProgressIndicator(color: AppColors.accentAmber))
@@ -1218,7 +1221,7 @@ class _CashCounterTab extends StatelessWidget {
                       Text("Opened at: ${reg['activeSession']['opened_at']}",
                           style: GoogleFonts.poppins(color: AppColors.textMuted, fontSize: 11)),
                     ],
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
                       height: 48,
@@ -1239,6 +1242,40 @@ class _CashCounterTab extends StatelessWidget {
                         label: Text(active ? 'Close Register' : 'Open Register', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
                       ),
                     ),
+                    if (active) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showAddDrawerTransactionSheet(context, provider, initialType: 'cash_out'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.statusRed,
+                                side: BorderSide(color: AppColors.statusRed.withOpacity(0.5)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                              icon: const Icon(Icons.remove_circle_outline_rounded, size: 16),
+                              label: Text('- Cash Expense', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 12)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showAddDrawerTransactionSheet(context, provider, initialType: 'cash_in'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.statusGreen,
+                                side: BorderSide(color: AppColors.statusGreen.withOpacity(0.5)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                              icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                              label: Text('+ Add Float', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 12)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1259,10 +1296,134 @@ class _CashCounterTab extends StatelessWidget {
                       const SizedBox(height: 16),
                       _CashRow(label: 'Opening Balance', value: openBal, color: AppColors.textPrimary),
                       _CashRow(label: 'Cash Sales', value: sales, color: AppColors.statusGreen, prefix: '+'),
+                      if (counterCashIn > 0)
+                        _CashRow(label: 'Cash In (Float Top-up)', value: counterCashIn, color: AppColors.statusGreen, prefix: '+'),
                       _CashRow(label: 'Deposits', value: deposits, color: AppColors.statusGreen, prefix: '+'),
                       _CashRow(label: 'Withdrawals', value: withdrawals, color: AppColors.statusRed, prefix: '-'),
+                      if (counterExpenses > 0)
+                        _CashRow(label: 'Counter Cash-Out (Expenses)', value: counterExpenses, color: AppColors.statusRed, prefix: '-'),
                       Divider(color: AppColors.darkBorder, height: 24),
                       _CashRow(label: 'Expected Balance', value: expected, color: AppColors.accentAmber, isBold: true),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.darkCard,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.darkBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text("Today's Drawer Transactions",
+                              style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.w600)),
+                          Text(
+                            '${todayTxns.length} items',
+                            style: GoogleFonts.poppins(color: AppColors.textMuted, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (todayTxns.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Text('No drawer expenses or float added today.',
+                              style: GoogleFonts.poppins(color: AppColors.textMuted, fontSize: 12)),
+                        )
+                      else
+                        ...todayTxns.map((t) {
+                          final Map<String, dynamic> item = Map<String, dynamic>.from(t is Map ? t : {});
+                          final bool isOut = item['type'] == 'cash_out';
+                          final double amt = JsonUtils.parseDouble(item['amount']);
+                          final String note = item['notes'] ?? '';
+                          final user = item['user'] is Map ? item['user']['name'] : 'Staff';
+                          final cat = item['category'] is Map ? item['category']['name'] : null;
+                          final int txnId = JsonUtils.parseInt(item['id']);
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: AppColors.darkSurface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.darkBorder.withOpacity(0.5)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: (isOut ? AppColors.statusRed : AppColors.statusGreen).withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    isOut ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                                    color: isOut ? AppColors.statusRed : AppColors.statusGreen,
+                                    size: 16,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(note.isNotEmpty ? note : (isOut ? 'Cash Out' : 'Cash In'),
+                                          style: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 13)),
+                                      Text(
+                                        '${cat != null ? "$cat • " : ""}$user',
+                                        style: GoogleFonts.poppins(color: AppColors.textMuted, fontSize: 11),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  '${isOut ? "-" : "+"} ${_fmt(amt)}',
+                                  style: GoogleFonts.poppins(
+                                    color: isOut ? AppColors.statusRed : AppColors.statusGreen,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.grey),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (c) => AlertDialog(
+                                        backgroundColor: AppColors.darkCard,
+                                        title: Text('Delete Drawer Entry', style: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+                                        content: Text('Remove this cash entry of ${_fmt(amt)} ($note)? Drawer balance and GL will be updated.', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
+                                        actions: [
+                                          TextButton(onPressed: () => Navigator.pop(c, false), child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textMuted))),
+                                          ElevatedButton(
+                                            onPressed: () => Navigator.pop(c, true),
+                                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.statusRed),
+                                            child: Text('Delete', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirm == true) {
+                                      final ok = await provider.deleteCashCounterTransaction(txnId);
+                                      if (ok && context.mounted) {
+                                        showTopSnackBar(context, SnackBar(content: const Text('Transaction deleted'), backgroundColor: AppColors.statusGreen));
+                                      }
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
                     ],
                   ),
                 ),
@@ -1298,6 +1459,237 @@ class _CashCounterTab extends StatelessWidget {
               const SizedBox(height: 24),
             ],
           );
+  }
+
+  void _showAddDrawerTransactionSheet(BuildContext context, FinanceProvider provider, {String initialType = 'cash_out'}) {
+    final amountCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
+    String currentType = initialType;
+    int? selectedCategory;
+    final categories = provider.counterExpenseCategories;
+
+    final suggestionChips = ['Lemon', 'Sugar', 'Lighter', 'Milk', 'Tea Leaves', 'Ice', 'Cleaning', 'Market'];
+    final quickAmounts = [50, 100, 200, 500];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.darkCard,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setStateSheet) => Padding(
+          padding: EdgeInsets.only(left: 24, right: 24, top: 24, bottom: MediaQuery.of(ctx2).viewInsets.bottom + 24),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      currentType == 'cash_out' ? 'Record Cash Expense (Cash Out)' : 'Add Cash Float (Cash In)',
+                      style: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.grey, size: 20),
+                      onPressed: () => Navigator.pop(ctx2),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Type selector toggle
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setStateSheet(() => currentType = 'cash_out'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: currentType == 'cash_out' ? AppColors.statusRed.withOpacity(0.15) : AppColors.darkSurface,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: currentType == 'cash_out' ? AppColors.statusRed : AppColors.darkBorder),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            'Cash Out (Expense)',
+                            style: GoogleFonts.poppins(
+                              color: currentType == 'cash_out' ? AppColors.statusRed : AppColors.textMuted,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setStateSheet(() => currentType = 'cash_in'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: currentType == 'cash_in' ? AppColors.statusGreen.withOpacity(0.15) : AppColors.darkSurface,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: currentType == 'cash_in' ? AppColors.statusGreen : AppColors.darkBorder),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            'Cash In (Float)',
+                            style: GoogleFonts.poppins(
+                              color: currentType == 'cash_in' ? AppColors.statusGreen : AppColors.textMuted,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: amountCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    labelText: 'Amount (Rs.)',
+                    prefixText: '${AppConstants.currencySymbol} ',
+                    filled: true,
+                    fillColor: AppColors.darkSurface,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Quick Amount chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: quickAmounts.map((q) => Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ActionChip(
+                        label: Text('Rs. $q', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textPrimary)),
+                        backgroundColor: AppColors.darkSurface,
+                        side: BorderSide(color: AppColors.darkBorder),
+                        onPressed: () {
+                          amountCtrl.text = q.toString();
+                          setStateSheet(() {});
+                        },
+                      ),
+                    )).toList(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: notesCtrl,
+                  style: TextStyle(color: AppColors.textPrimary),
+                  decoration: InputDecoration(
+                    labelText: currentType == 'cash_out' ? 'Reason / Expense Description' : 'Float Notes',
+                    hintText: currentType == 'cash_out' ? 'e.g. Lemon, sugar, lighter...' : 'e.g. Change top-up',
+                    hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    filled: true,
+                    fillColor: AppColors.darkSurface,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                if (currentType == 'cash_out') ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: suggestionChips.map((chip) => GestureDetector(
+                      onTap: () {
+                        if (notesCtrl.text.trim().isEmpty) {
+                          notesCtrl.text = chip;
+                        } else {
+                          notesCtrl.text = "${notesCtrl.text.trim()}, $chip";
+                        }
+                        setStateSheet(() {});
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.darkSurface,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.darkBorder),
+                        ),
+                        child: Text(
+                          "+ $chip",
+                          style: GoogleFonts.poppins(fontSize: 11, color: AppColors.accentAmber),
+                        ),
+                      ),
+                    )).toList(),
+                  ),
+                  if (categories.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<int>(
+                      value: selectedCategory,
+                      dropdownColor: AppColors.darkCard,
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      decoration: InputDecoration(
+                        labelText: 'Expense Category (Optional)',
+                        filled: true,
+                        fillColor: AppColors.darkSurface,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      items: categories.map<DropdownMenuItem<int>>((cat) {
+                        return DropdownMenuItem<int>(
+                          value: JsonUtils.parseInt(cat['id']),
+                          child: Text(cat['name'] ?? ''),
+                        );
+                      }).toList(),
+                      onChanged: (v) => setStateSheet(() => selectedCategory = v),
+                    ),
+                  ],
+                ],
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final val = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
+                      final note = notesCtrl.text.trim();
+                      if (val <= 0 || note.isEmpty) {
+                        showTopSnackBar(context, SnackBar(content: const Text('Please enter a valid amount and description'), backgroundColor: AppColors.statusRed));
+                        return;
+                      }
+
+                      final success = await provider.addCashCounterTransaction(
+                        amount: val,
+                        notes: note,
+                        type: currentType,
+                        expenseCategoryId: selectedCategory,
+                      );
+
+                      if (success && ctx2.mounted) {
+                        Navigator.pop(ctx2);
+                        showTopSnackBar(context, SnackBar(
+                          content: Text(currentType == 'cash_out' ? 'Cash expense recorded successfully' : 'Float added to counter successfully'),
+                          backgroundColor: AppColors.statusGreen,
+                        ));
+                      } else if (ctx2.mounted) {
+                        showTopSnackBar(context, SnackBar(content: Text(provider.error ?? 'Transaction failed'), backgroundColor: AppColors.statusRed));
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: currentType == 'cash_out' ? AppColors.statusRed : AppColors.statusGreen,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text(
+                      currentType == 'cash_out' ? 'Record Expense' : 'Add Float',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _showOpenRegisterSheet(BuildContext context, FinanceProvider provider) {

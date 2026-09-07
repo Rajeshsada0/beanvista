@@ -363,6 +363,71 @@ class ApiController extends Controller
             ->whereDate('updated_at', $today)
             ->sum('online_amount');
 
+        // Cash Counter & Cash Out Expenses for Today
+        $tenantId = auth()->user()->tenant_id;
+        $todayCashExpenses = 0;
+        $todayCounterExpenses = collect();
+
+        if (class_exists(\App\Models\CashRegisterTransaction::class) && \Illuminate\Support\Facades\Schema::hasTable('cash_register_transactions')) {
+            $todayCashExpenses = \App\Models\CashRegisterTransaction::where('tenant_id', $tenantId)
+                ->whereDate('created_at', $today)
+                ->where('type', 'cash_out')
+                ->sum('amount');
+
+            $todayCounterExpenses = \App\Models\CashRegisterTransaction::where('tenant_id', $tenantId)
+                ->whereDate('created_at', $today)
+                ->where('type', 'cash_out')
+                ->with(['user:id,name', 'category:id,name'])
+                ->latest()
+                ->take(10)
+                ->get();
+        }
+
+        // Active Cash Register Session
+        $activeSession = \App\Models\CashRegisterSession::where('tenant_id', $tenantId)
+            ->where('status', 'open')
+            ->first();
+
+        $counterExpenses = 0;
+        $counterCashIn = 0;
+        $counterCashSales = 0;
+        $counterCashDeposits = 0;
+        $counterCashWithdrawals = 0;
+
+        if ($activeSession) {
+            $counterCashSales = \App\Models\Order::where('tenant_id', $tenantId)
+                ->where('status', 'completed')
+                ->where('payment_method', 'cash')
+                ->where('created_at', '>=', $activeSession->opened_at)
+                ->sum('grand_total');
+
+            if (class_exists(\App\Models\CashRegisterTransaction::class) && \Illuminate\Support\Facades\Schema::hasTable('cash_register_transactions')) {
+                $counterExpenses = \App\Models\CashRegisterTransaction::where('cash_register_session_id', $activeSession->id)
+                    ->where('type', 'cash_out')
+                    ->sum('amount');
+
+                $counterCashIn = \App\Models\CashRegisterTransaction::where('cash_register_session_id', $activeSession->id)
+                    ->where('type', 'cash_in')
+                    ->sum('amount');
+            }
+
+            $cashDrawerIds = \App\Models\BankAccount::where('tenant_id', $tenantId)
+                ->where('account_type', 'cash')
+                ->pluck('id');
+
+            if ($cashDrawerIds->isNotEmpty()) {
+                $counterCashDeposits = \App\Models\BankTransaction::whereIn('bank_account_id', $cashDrawerIds)
+                    ->where('type', 'deposit')
+                    ->where('created_at', '>=', $activeSession->opened_at)
+                    ->sum('amount');
+
+                $counterCashWithdrawals = \App\Models\BankTransaction::whereIn('bank_account_id', $cashDrawerIds)
+                    ->where('type', 'withdrawal')
+                    ->where('created_at', '>=', $activeSession->opened_at)
+                    ->sum('amount');
+            }
+        }
+
         // Top Selling Products
         $topSellingItems = OrderItem::whereHas('order', function ($query) {
                 $query->where('status', 'completed');
@@ -417,8 +482,6 @@ class ApiController extends Controller
         // Dynamic Notifications for Dashboard
         $notifications = [];
 
-
-
         // 2. Unpaid Bills (Pending/Preparing/Served Orders)
         $unpaidOrders = Order::with('table')
             ->whereNotIn('status', ['completed', 'cancelled'])
@@ -470,6 +533,7 @@ class ApiController extends Controller
                 'today_sales' => (float)$todaySales,
                 'today_cash' => (float)$todayCash,
                 'today_online' => (float)$todayOnline,
+                'today_cash_expenses' => (float)$todayCashExpenses,
                 'yesterday_sales' => (float)$yesterdaySales,
                 'monthly_sales' => (float)$monthlySales,
                 'total_sales' => (float)$totalSales,
@@ -482,6 +546,13 @@ class ApiController extends Controller
             'low_stock' => $lowStock,
             'recent_activity' => $recentActivity,
             'notifications' => $notifications,
+            'activeSession' => $activeSession,
+            'cashSales' => (float)$counterCashSales,
+            'cashDeposits' => (float)$counterCashDeposits,
+            'cashWithdrawals' => (float)$counterCashWithdrawals,
+            'counterExpenses' => (float)$counterExpenses,
+            'counterCashIn' => (float)$counterCashIn,
+            'todayCounterExpenses' => $todayCounterExpenses,
         ]);
     }
 
@@ -680,7 +751,7 @@ class ApiController extends Controller
     public function orders(Request $request)
     {
         $status = $request->input('status', 'all');
-        $query = Order::with(['table', 'items.menu', 'items.addons', 'customer', 'waiter']);
+        $query = Order::with(['table', 'items.menu', 'items.addons', 'customer', 'waiter', 'bankAccount']);
 
         if ($status === 'active') {
             $query->where(function($q) {
@@ -716,6 +787,17 @@ class ApiController extends Controller
                     'customer' => $o->customer ? $o->customer->name : null,
                     'waiter' => $o->waiter ? $o->waiter->name : null,
                     'status' => $o->status,
+                    'payment_method' => $o->payment_method,
+                    'cash_amount' => (float)$o->cash_amount,
+                    'online_amount' => (float)$o->online_amount,
+                    'bank_account_id' => $o->bank_account_id,
+                    'bank_account' => $o->bankAccount ? [
+                        'id' => $o->bankAccount->id,
+                        'account_name' => $o->bankAccount->account_name,
+                        'bank_name' => $o->bankAccount->bank_name,
+                        'account_number' => $o->bankAccount->account_number,
+                        'qr_code_url' => $o->bankAccount->qr_code_url,
+                    ] : null,
                     'total' => (float)$o->grand_total,
                     'time' => Carbon::parse($o->created_at)->diffForHumans(),
                     'created_at' => $o->created_at->toIso8601String(),
@@ -1502,7 +1584,7 @@ class ApiController extends Controller
      */
     public function showOrder($id)
     {
-        $order = Order::with(['table', 'items.menu', 'customer'])->findOrFail($id);
+        $order = Order::with(['table', 'items.menu', 'customer', 'bankAccount'])->findOrFail($id);
 
         return response()->json([
             'success' => true,
@@ -1514,6 +1596,17 @@ class ApiController extends Controller
                 'table' => $order->table ? $order->table->table_number : 'Takeaway',
                 'customer' => $order->customer ? $order->customer->name : null,
                 'status' => $order->status,
+                'payment_method' => $order->payment_method,
+                'cash_amount' => (float)$order->cash_amount,
+                'online_amount' => (float)$order->online_amount,
+                'bank_account_id' => $order->bank_account_id,
+                'bank_account' => $order->bankAccount ? [
+                    'id' => $order->bankAccount->id,
+                    'account_name' => $order->bankAccount->account_name,
+                    'bank_name' => $order->bankAccount->bank_name,
+                    'account_number' => $order->bankAccount->account_number,
+                    'qr_code_url' => $order->bankAccount->qr_code_url,
+                ] : null,
                 'total' => (float)$order->grand_total,
                 'time' => Carbon::parse($order->created_at)->diffForHumans(),
                 'created_at' => $order->created_at->toIso8601String(),
@@ -4125,13 +4218,23 @@ class ApiController extends Controller
     public function getCashCounter()
     {
         $tenantId = auth()->user()->tenant_id;
-        $activeSession = \App\Models\CashRegisterSession::where('tenant_id', $tenantId)
+        $activeSessionQuery = \App\Models\CashRegisterSession::where('tenant_id', $tenantId)
             ->where('status', 'open')
-            ->first();
+            ->with(['user']);
+
+        if (class_exists(\App\Models\CashRegisterTransaction::class) && \Illuminate\Support\Facades\Schema::hasTable('cash_register_transactions')) {
+            $activeSessionQuery->with(['transactions' => function($q) {
+                $q->with(['user:id,name', 'category:id,name'])->orderBy('created_at', 'desc');
+            }]);
+        }
+
+        $activeSession = $activeSessionQuery->first();
 
         $cashSales = 0;
         $cashDeposits = 0;
         $cashWithdrawals = 0;
+        $counterExpenses = 0;
+        $counterCashIn = 0;
 
         if ($activeSession) {
             $cashSales = \App\Models\Order::where('tenant_id', $tenantId)
@@ -4139,6 +4242,11 @@ class ApiController extends Controller
                 ->where('payment_method', 'cash')
                 ->where('created_at', '>=', $activeSession->opened_at)
                 ->sum('grand_total');
+
+            if (class_exists(\App\Models\CashRegisterTransaction::class) && \Illuminate\Support\Facades\Schema::hasTable('cash_register_transactions')) {
+                $counterExpenses = $activeSession->transactions ? $activeSession->transactions->where('type', 'cash_out')->sum('amount') : 0;
+                $counterCashIn = $activeSession->transactions ? $activeSession->transactions->where('type', 'cash_in')->sum('amount') : 0;
+            }
 
             $cashDrawerIds = \App\Models\BankAccount::where('tenant_id', $tenantId)
                 ->where('account_type', 'cash')
@@ -4157,9 +4265,29 @@ class ApiController extends Controller
             }
         }
 
-        $previousSessions = \App\Models\CashRegisterSession::where('tenant_id', $tenantId)
-            ->with(['user', 'closedBy'])
+        $todayCounterExpenses = collect();
+        if (class_exists(\App\Models\CashRegisterTransaction::class) && \Illuminate\Support\Facades\Schema::hasTable('cash_register_transactions')) {
+            $todayCounterExpenses = \App\Models\CashRegisterTransaction::where('tenant_id', $tenantId)
+                ->whereDate('created_at', today())
+                ->with(['user:id,name', 'category:id,name'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+        }
+
+        $expenseCategories = \App\Models\ExpenseCategory::all(['id', 'name']);
+
+        $previousSessionsQuery = \App\Models\CashRegisterSession::where('tenant_id', $tenantId)
+            ->with(['user', 'closedBy']);
+
+        if (class_exists(\App\Models\CashRegisterTransaction::class) && \Illuminate\Support\Facades\Schema::hasTable('cash_register_transactions')) {
+            $previousSessionsQuery->with(['transactions' => function($q) {
+                $q->with(['user:id,name', 'category:id,name'])->orderBy('created_at', 'desc');
+            }]);
+        }
+
+        $previousSessions = $previousSessionsQuery
             ->orderBy('opened_at', 'desc')
+            ->take(20)
             ->get();
 
         return response()->json([
@@ -4168,6 +4296,10 @@ class ApiController extends Controller
             'cashSales' => (double)$cashSales,
             'cashDeposits' => (double)$cashDeposits,
             'cashWithdrawals' => (double)$cashWithdrawals,
+            'counterExpenses' => (double)$counterExpenses,
+            'counterCashIn' => (double)$counterCashIn,
+            'todayCounterExpenses' => $todayCounterExpenses,
+            'expenseCategories' => $expenseCategories,
             'previousSessions' => $previousSessions,
         ]);
     }
@@ -4235,6 +4367,13 @@ class ApiController extends Controller
             ->where('created_at', '>=', $session->opened_at)
             ->sum('grand_total');
 
+        $counterExpenses = 0;
+        $counterCashIn = 0;
+        if (class_exists(\App\Models\CashRegisterTransaction::class) && \Illuminate\Support\Facades\Schema::hasTable('cash_register_transactions')) {
+            $counterExpenses = $session->cashOutTransactions()->sum('amount');
+            $counterCashIn = $session->cashInTransactions()->sum('amount');
+        }
+
         $cashDeposits = 0;
         $cashWithdrawals = 0;
         $cashDrawerIds = \App\Models\BankAccount::where('tenant_id', $tenantId)
@@ -4253,7 +4392,7 @@ class ApiController extends Controller
                 ->sum('amount');
         }
 
-        $expectedBalance = $session->opening_balance + $cashSales + $cashDeposits - $cashWithdrawals;
+        $expectedBalance = $session->opening_balance + $cashSales + $cashDeposits + $counterCashIn - $cashWithdrawals - $counterExpenses;
         $closingBalance = $request->closing_balance;
         $discrepancy = $closingBalance - $expectedBalance;
 
@@ -4324,6 +4463,175 @@ class ApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Cash register session closed successfully',
+            'expected_balance' => (float)$expectedBalance,
+            'closing_balance' => (float)$closingBalance,
+            'discrepancy' => (float)$discrepancy,
+        ]);
+    }
+
+    public function storeCashCounterTransaction(Request $request)
+    {
+        if (auth()->user()->role === 'waiter') {
+            return response()->json(['success' => false, 'message' => 'Waiters are not authorized to perform drawer transactions.'], 403);
+        }
+
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:0.01',
+            'notes' => 'required|string|max:500',
+            'type' => 'required|in:cash_out,cash_in',
+            'expense_category_id' => 'nullable|exists:expense_categories,id',
+        ]);
+
+        $tenantId = auth()->user()->tenant_id;
+        $activeSession = \App\Models\CashRegisterSession::where('tenant_id', $tenantId)
+            ->where('status', 'open')
+            ->first();
+
+        if (!$activeSession) {
+            return response()->json(['success' => false, 'message' => 'No cash register session is currently open. Please open the cash register first.'], 422);
+        }
+
+        // Auto-ensure table exists if migration hasn't run on live
+        if (!\Illuminate\Support\Facades\Schema::hasTable('cash_register_transactions')) {
+            try {
+                \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+            } catch (\Throwable $e) {}
+            if (!\Illuminate\Support\Facades\Schema::hasTable('cash_register_transactions')) {
+                \Illuminate\Support\Facades\Schema::create('cash_register_transactions', function (\Illuminate\Database\Schema\Blueprint $table) {
+                    $table->id();
+                    $table->unsignedBigInteger('tenant_id')->index();
+                    $table->unsignedBigInteger('branch_id')->nullable()->index();
+                    $table->unsignedBigInteger('cash_register_session_id')->index();
+                    $table->unsignedBigInteger('user_id')->index();
+                    $table->enum('type', ['cash_out', 'cash_in'])->default('cash_out');
+                    $table->decimal('amount', 12, 2);
+                    $table->string('notes', 500);
+                    $table->unsignedBigInteger('expense_category_id')->nullable();
+                    $table->unsignedBigInteger('expense_id')->nullable()->index();
+                    $table->timestamps();
+                });
+            }
+        }
+
+        $transaction = DB::transaction(function () use ($validated, $activeSession, $tenantId) {
+            $expenseId = null;
+
+            if ($validated['type'] === 'cash_out') {
+                $categoryId = $validated['expense_category_id'] ?? null;
+                if (!$categoryId) {
+                    $generalExpenseAccount = \App\Models\Account::firstOrCreate(
+                        ['tenant_id' => $tenantId, 'code' => '6004'],
+                        ['name' => 'General Expenses', 'type' => 'expense', 'description' => 'Default general expenses account']
+                    );
+
+                    $defaultCat = \App\Models\ExpenseCategory::firstOrCreate(
+                        ['name' => 'General Expense'],
+                        ['account_id' => $generalExpenseAccount->id]
+                    );
+                    $categoryId = $defaultCat->id;
+                }
+
+                $cashPaymentMethod = \App\Models\PaymentMethod::where('type', 'cash')->first();
+                $branchId = $activeSession->branch_id ?? (session('active_branch_id') ?: auth()->user()->primary_branch_id);
+
+                $expense = \App\Models\Expense::create([
+                    'tenant_id' => $tenantId,
+                    'branch_id' => $branchId,
+                    'expense_category_id' => $categoryId,
+                    'amount' => $validated['amount'],
+                    'date' => now()->toDateString(),
+                    'payment_method_id' => $cashPaymentMethod?->id,
+                    'reference' => 'REG-' . $activeSession->id,
+                    'notes' => 'Counter Cash: ' . $validated['notes'],
+                ]);
+                $expenseId = $expense->id;
+
+                $category = \App\Models\ExpenseCategory::find($categoryId);
+                $cashAccount = \App\Models\Account::where('tenant_id', $tenantId)->where('code', '1001')->first();
+                if ($cashAccount && $category && $category->account_id) {
+                    $journalEntry = \App\Models\JournalEntry::create([
+                        'tenant_id' => $tenantId,
+                        'branch_id' => $branchId,
+                        'reference_number' => 'EXP-REG-' . $expense->id,
+                        'date' => now()->toDateString(),
+                        'description' => 'Counter Cash Expense: ' . $category->name . ' - ' . $validated['notes'],
+                        'status' => 'posted',
+                    ]);
+
+                    $journalEntry->lines()->create([
+                        'account_id' => $category->account_id,
+                        'debit' => $validated['amount'],
+                        'credit' => 0,
+                        'description' => 'Counter Cash Expense: ' . $validated['notes'],
+                    ]);
+
+                    $journalEntry->lines()->create([
+                        'account_id' => $cashAccount->id,
+                        'debit' => 0,
+                        'credit' => $validated['amount'],
+                        'description' => 'Cash Drawer Payout: ' . $validated['notes'],
+                    ]);
+                }
+            }
+
+            $branchId = $activeSession->branch_id ?? (session('active_branch_id') ?: auth()->user()->primary_branch_id);
+
+            $txn = \App\Models\CashRegisterTransaction::create([
+                'tenant_id' => $tenantId,
+                'branch_id' => $branchId,
+                'cash_register_session_id' => $activeSession->id,
+                'user_id' => auth()->id(),
+                'type' => $validated['type'],
+                'amount' => $validated['amount'],
+                'notes' => $validated['notes'],
+                'expense_category_id' => $validated['expense_category_id'] ?? null,
+                'expense_id' => $expenseId,
+            ]);
+
+            $actionText = $validated['type'] === 'cash_out' ? 'Cash Out / Expense' : 'Cash In / Float Top-up';
+            \App\Models\ActivityLog::record(
+                'register_transaction',
+                "{$actionText} of " . number_format($validated['amount'], 2) . ": {$validated['notes']}",
+                $txn
+            );
+
+            return $txn->load(['user:id,name', 'category:id,name']);
+        });
+
+        $msg = $validated['type'] === 'cash_out' 
+            ? 'Cash expense recorded from counter successfully.' 
+            : 'Cash float added to counter successfully.';
+
+        return response()->json([
+            'success' => true,
+            'message' => $msg,
+            'transaction' => $transaction,
+        ]);
+    }
+
+    public function destroyCashCounterTransaction($id)
+    {
+        if (auth()->user()->role === 'waiter') {
+            return response()->json(['success' => false, 'message' => 'Waiters are not authorized to delete drawer transactions.'], 403);
+        }
+
+        $transaction = \App\Models\CashRegisterTransaction::findOrFail($id);
+
+        if ($transaction->session && $transaction->session->status !== 'open') {
+            return response()->json(['success' => false, 'message' => 'Cannot delete a transaction from a closed register session.'], 422);
+        }
+
+        DB::transaction(function () use ($transaction) {
+            if ($transaction->expense) {
+                \App\Models\JournalEntry::where('reference_number', 'EXP-REG-' . $transaction->expense->id)->delete();
+                $transaction->expense->delete();
+            }
+            $transaction->delete();
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Counter transaction deleted successfully.',
         ]);
     }
 

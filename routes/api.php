@@ -118,6 +118,9 @@ Route::middleware(ApiTokenAuth::class)->group(function () {
     Route::get('/finance/cash-counter', [ApiController::class, 'getCashCounter']);
     Route::post('/finance/cash-counter/open', [ApiController::class, 'openCashCounter']);
     Route::post('/finance/cash-counter/close/{session}', [ApiController::class, 'closeCashCounter']);
+    Route::post('/finance/cash-counter/{session}/close', [ApiController::class, 'closeCashCounter']);
+    Route::post('/finance/cash-counter/transaction', [ApiController::class, 'storeCashCounterTransaction']);
+    Route::delete('/finance/cash-counter/transaction/{id}', [ApiController::class, 'destroyCashCounterTransaction']);
 
     // Reports
     Route::get('/reports', [ApiController::class, 'getReports']);

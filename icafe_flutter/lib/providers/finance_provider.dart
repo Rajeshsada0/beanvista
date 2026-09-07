@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/services/api_service.dart';
+import '../core/utils/json_utils.dart';
 
 class FinanceProvider extends ChangeNotifier {
   final ApiService _apiService;
@@ -59,6 +60,10 @@ class FinanceProvider extends ChangeNotifier {
   List<dynamic> get bankAccounts => _bankAccounts;
   List<dynamic> get bankTransactions => _bankTransactions;
   Map<String, dynamic> get cashRegister => _cashRegister;
+  double get counterExpenses => JsonUtils.parseDouble(_cashRegister['counterExpenses']);
+  double get counterCashIn => JsonUtils.parseDouble(_cashRegister['counterCashIn']);
+  List<dynamic> get todayCounterExpenses => _cashRegister['todayCounterExpenses'] is List ? _cashRegister['todayCounterExpenses'] : [];
+  List<dynamic> get counterExpenseCategories => _cashRegister['expenseCategories'] is List ? _cashRegister['expenseCategories'] : [];
 
   // Set Date Range
   void setDateRange(DateTime start, DateTime end) {
@@ -795,6 +800,62 @@ class FinanceProvider extends ChangeNotifier {
         return true;
       } else {
         _error = res?['message'] ?? 'Failed to close register session';
+        return false;
+      }
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> addCashCounterTransaction({
+    required double amount,
+    required String notes,
+    required String type,
+    int? expenseCategoryId,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final res = await _apiService.post('/finance/cash-counter/transaction', {
+        'amount': amount,
+        'notes': notes,
+        'type': type,
+        if (expenseCategoryId != null) 'expense_category_id': expenseCategoryId,
+      });
+      if (res != null && res['success'] == true) {
+        await fetchCashCounter();
+        return true;
+      } else {
+        _error = res?['message'] ?? 'Failed to record drawer transaction';
+        return false;
+      }
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> deleteCashCounterTransaction(int transactionId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final res = await _apiService.delete('/finance/cash-counter/transaction/$transactionId');
+      if (res == true) {
+        await fetchCashCounter();
+        return true;
+      } else {
+        _error = 'Failed to delete counter transaction';
         return false;
       }
     } catch (e) {

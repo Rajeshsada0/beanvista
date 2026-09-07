@@ -73,6 +73,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   int _totalCustomers = 0;
   double _cashSales = 0.0;
   double _onlineSales = 0.0;
+  double _todayCashExpenses = 0.0;
   double _monthlySales = 0.0;
   int _totalItems = 0;
   double _avgTurnaroundMins = 0.0;
@@ -145,6 +146,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           _totalCustomers = JsonUtils.parseInt(stats['total_customers']);
           _cashSales = JsonUtils.parseDouble(stats['today_cash']);
           _onlineSales = JsonUtils.parseDouble(stats['today_online']);
+          _todayCashExpenses = JsonUtils.parseDouble(stats['today_cash_expenses']);
           _monthlySales = JsonUtils.parseDouble(stats['monthly_sales']);
           _totalItems = JsonUtils.parseInt(stats['total_items']);
           _avgTurnaroundMins = JsonUtils.parseDouble(stats['avg_turnaround_mins']);
@@ -1212,27 +1214,109 @@ class _DashboardScreenState extends State<DashboardScreen>
                         ],
                       ),
                     ),
+                    if (_todayCashExpenses > 0) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.statusRed.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.remove_circle_outline_rounded, color: AppColors.statusRed, size: 10),
+                            const SizedBox(width: 4),
+                            Text('EXPENSE', style: GoogleFonts.plusJakartaSans(fontSize: 8, fontWeight: FontWeight.bold, color: AppColors.statusRed)),
+                            Expanded(
+                              child: Text(
+                                '- ${AppConstants.currencySymbol}${_todayCashExpenses.toStringAsFixed(2)}',
+                                style: GoogleFonts.plusJakartaSans(fontSize: 8.5, fontWeight: FontWeight.bold, color: AppColors.statusRed),
+                                textAlign: TextAlign.end,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 );
               } else {
-                return Row(
+                return Column(
                   children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.statusGreen.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.payments_rounded, color: AppColors.statusGreen, size: 10),
+                                const SizedBox(width: 4),
+                                Text('CASH', style: GoogleFonts.plusJakartaSans(fontSize: 7.5, fontWeight: FontWeight.bold, color: AppColors.statusGreen)),
+                                Expanded(
+                                  child: Text(
+                                    '${AppConstants.currencySymbol}${_cashSales.toStringAsFixed(2)}',
+                                    style: GoogleFonts.plusJakartaSans(fontSize: 8.5, fontWeight: FontWeight.bold, color: AppColors.statusGreen),
+                                    textAlign: TextAlign.end,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.statusBlue.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.payment_rounded, color: AppColors.statusBlue, size: 10),
+                                const SizedBox(width: 4),
+                                Text('ONLINE', style: GoogleFonts.plusJakartaSans(fontSize: 7.5, fontWeight: FontWeight.bold, color: AppColors.statusBlue)),
+                                Expanded(
+                                  child: Text(
+                                    '${AppConstants.currencySymbol}${_onlineSales.toStringAsFixed(2)}',
+                                    style: GoogleFonts.plusJakartaSans(fontSize: 8.5, fontWeight: FontWeight.bold, color: AppColors.statusBlue),
+                                    textAlign: TextAlign.end,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_todayCashExpenses > 0) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
-                          color: AppColors.statusGreen.withOpacity(0.08),
+                          color: AppColors.statusRed.withOpacity(0.08),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.payments_rounded, color: AppColors.statusGreen, size: 10),
+                            Icon(Icons.remove_circle_outline_rounded, color: AppColors.statusRed, size: 9),
                             const SizedBox(width: 4),
-                            Text('CASH', style: GoogleFonts.plusJakartaSans(fontSize: 7.5, fontWeight: FontWeight.bold, color: AppColors.statusGreen)),
+                            Text('COUNTER EXPENSE', style: GoogleFonts.plusJakartaSans(fontSize: 7.5, fontWeight: FontWeight.bold, color: AppColors.statusRed)),
                             Expanded(
                               child: Text(
-                                '${AppConstants.currencySymbol}${_cashSales.toStringAsFixed(2)}',
-                                style: GoogleFonts.plusJakartaSans(fontSize: 8.5, fontWeight: FontWeight.bold, color: AppColors.statusGreen),
+                                '- ${AppConstants.currencySymbol}${_todayCashExpenses.toStringAsFixed(2)}',
+                                style: GoogleFonts.plusJakartaSans(fontSize: 8, fontWeight: FontWeight.bold, color: AppColors.statusRed),
                                 textAlign: TextAlign.end,
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
@@ -1241,33 +1325,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                           ],
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.statusBlue.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.payment_rounded, color: AppColors.statusBlue, size: 10),
-                            const SizedBox(width: 4),
-                            Text('ONLINE', style: GoogleFonts.plusJakartaSans(fontSize: 7.5, fontWeight: FontWeight.bold, color: AppColors.statusBlue)),
-                            Expanded(
-                              child: Text(
-                                '${AppConstants.currencySymbol}${_onlineSales.toStringAsFixed(2)}',
-                                style: GoogleFonts.plusJakartaSans(fontSize: 8.5, fontWeight: FontWeight.bold, color: AppColors.statusBlue),
-                                textAlign: TextAlign.end,
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    ],
                   ],
                 );
               }
