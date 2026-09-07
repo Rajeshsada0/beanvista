@@ -1080,6 +1080,30 @@ class FinanceController extends Controller
             return back()->with('error', 'No cash register session is currently open. Please open the cash register first.');
         }
 
+        // Auto-ensure table exists if migration hasn't run on live
+        if (!\Illuminate\Support\Facades\Schema::hasTable('cash_register_transactions')) {
+            try {
+                \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+            } catch (\Throwable $e) {
+                // Ignore migration artisan error
+            }
+            if (!\Illuminate\Support\Facades\Schema::hasTable('cash_register_transactions')) {
+                \Illuminate\Support\Facades\Schema::create('cash_register_transactions', function (\Illuminate\Database\Schema\Blueprint $table) {
+                    $table->id();
+                    $table->unsignedBigInteger('tenant_id')->index();
+                    $table->unsignedBigInteger('branch_id')->nullable()->index();
+                    $table->unsignedBigInteger('cash_register_session_id')->index();
+                    $table->unsignedBigInteger('user_id')->index();
+                    $table->enum('type', ['cash_out', 'cash_in'])->default('cash_out');
+                    $table->decimal('amount', 12, 2);
+                    $table->string('notes', 500);
+                    $table->unsignedBigInteger('expense_category_id')->nullable();
+                    $table->unsignedBigInteger('expense_id')->nullable()->index();
+                    $table->timestamps();
+                });
+            }
+        }
+
         DB::transaction(function () use ($validated, $activeSession, $tenantId) {
             $expenseId = null;
 
