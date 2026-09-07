@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import {
     ArrowLeft,
     User,
@@ -21,7 +21,10 @@ import {
     DollarSign,
     ChevronDown,
     ChevronUp,
-    CreditCard
+    CreditCard,
+    Edit2,
+    Trash2,
+    Plus
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -37,6 +40,28 @@ export default function Show({ customer, orders, pointHistory, creditTransaction
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
 
+    // Edit Credit Transaction state
+    const [editingTx, setEditingTx] = useState(null);
+    const [editType, setEditType] = useState('payment');
+    const [editAmount, setEditAmount] = useState('');
+    const [editNote, setEditNote] = useState('');
+    const [editDate, setEditDate] = useState('');
+    const [editProcessing, setEditProcessing] = useState(false);
+    const [editErrors, setEditErrors] = useState({});
+
+    // Delete Credit Transaction state
+    const [deletingTx, setDeletingTx] = useState(null);
+    const [deleteProcessing, setDeleteProcessing] = useState(false);
+
+    // Add Credit Entry state
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [addType, setAddType] = useState('payment');
+    const [addAmount, setAddAmount] = useState('');
+    const [addNote, setAddNote] = useState('');
+    const [addDate, setAddDate] = useState(new Date().toISOString().slice(0, 10));
+    const [addProcessing, setAddProcessing] = useState(false);
+    const [addErrors, setAddErrors] = useState({});
+
     const { data, setData, post, processing, errors, reset } = useForm({
         amount: dueAmount,
         note: '',
@@ -47,6 +72,123 @@ export default function Show({ customer, orders, pointHistory, creditTransaction
         post(route('customers.credit-payment', customer.id), {
             onSuccess: () => { setShowPaymentModal(false); reset(); }
         });
+    };
+
+    const handleOpenEditModal = (tx) => {
+        setEditingTx(tx);
+        setEditType(tx.type);
+        setEditAmount(tx.amount);
+        setEditNote(tx.note || '');
+        if (tx.created_at) {
+            const d = new Date(tx.created_at);
+            const pad = (n) => String(n).padStart(2, '0');
+            const formatted = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            setEditDate(formatted);
+        } else {
+            setEditDate('');
+        }
+        setEditErrors({});
+    };
+
+    const submitEditTx = (e) => {
+        e.preventDefault();
+        if (!editingTx) return;
+        setEditProcessing(true);
+        setEditErrors({});
+        router.put(route('credit-transactions.update', editingTx.id), {
+            type: editType,
+            amount: editAmount,
+            note: editNote,
+            created_at: editDate ? new Date(editDate).toISOString() : undefined,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setEditingTx(null);
+                setEditProcessing(false);
+            },
+            onError: (errs) => {
+                setEditErrors(errs);
+                setEditProcessing(false);
+            }
+        });
+    };
+
+    const handleOpenDeleteModal = (tx) => {
+        setDeletingTx(tx);
+    };
+
+    const confirmDeleteTx = () => {
+        if (!deletingTx) return;
+        setDeleteProcessing(true);
+        router.delete(route('credit-transactions.destroy', deletingTx.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setDeletingTx(null);
+                setDeleteProcessing(false);
+            },
+            onError: () => {
+                setDeleteProcessing(false);
+            }
+        });
+    };
+
+    const handleOpenAddModal = (defaultType = 'payment') => {
+        setAddType(defaultType);
+        setAddAmount('');
+        setAddNote('');
+        const today = new Date().toISOString().slice(0, 10);
+        setAddDate(today);
+        setAddErrors({});
+        setShowAddModal(true);
+    };
+
+    const submitAddTx = (e) => {
+        e.preventDefault();
+        setAddProcessing(true);
+        setAddErrors({});
+        router.post(route('customers.credit-transactions.store', customer.id), {
+            type: addType,
+            amount: addAmount,
+            note: addNote,
+            date: addDate ? new Date(addDate).toISOString() : undefined,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowAddModal(false);
+                setAddAmount('');
+                setAddNote('');
+                setAddProcessing(false);
+            },
+            onError: (errs) => {
+                setAddErrors(errs);
+                setAddProcessing(false);
+            }
+        });
+    };
+
+    const getProjectedDueOnEdit = () => {
+        if (!editingTx) return dueAmount;
+        const oldType = editingTx.type;
+        const oldAmt = Number(editingTx.amount) || 0;
+        const newType = editType;
+        const newAmt = Number(editAmount) || 0;
+
+        let base = dueAmount;
+        if (oldType === 'charge') base -= oldAmt;
+        else base += oldAmt;
+
+        if (newType === 'charge') base += newAmt;
+        else base -= newAmt;
+
+        return Math.max(0, base);
+    };
+
+    const getProjectedDueOnAdd = () => {
+        const amt = Number(addAmount) || 0;
+        let base = dueAmount;
+        if (addType === 'charge') base += amt;
+        else base -= amt;
+        return Math.max(0, base);
     };
 
     return (
@@ -279,19 +421,32 @@ export default function Show({ customer, orders, pointHistory, creditTransaction
                         {/* Credit Ledger */}
                         <div className="bg-white/60 backdrop-blur-xl rounded-[2.5rem] border border-white/80 shadow-sm overflow-hidden">
                             <div className="px-8 py-6 border-b border-gray-100 bg-white/40 flex items-center justify-between">
-                                <h2 className="text-lg font-black text-gray-900 uppercase tracking-wider">Credit Ledger</h2>
-                                <div className={`p-2 rounded-xl ${dueAmount > 0 ? 'bg-rose-50 text-rose-500' : 'bg-gray-50 text-gray-300'}`}>
-                                    <BookOpen className="w-5 h-5" />
+                                <div>
+                                    <h2 className="text-lg font-black text-gray-900 uppercase tracking-wider">Credit Ledger</h2>
+                                    <p className="text-[11px] font-bold text-gray-400">History of charges and payments</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenAddModal('payment')}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-sm active:scale-95"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" />
+                                        Add Entry
+                                    </button>
+                                    <div className={`p-2 rounded-xl ${dueAmount > 0 ? 'bg-rose-50 text-rose-500' : 'bg-gray-50 text-gray-300'}`}>
+                                        <BookOpen className="w-5 h-5" />
+                                    </div>
                                 </div>
                             </div>
                             <div className="p-6">
                                 {creditTransactions && creditTransactions.length > 0 ? (
                                     <div className="space-y-3">
                                         {creditTransactions.map((tx) => (
-                                            <div key={tx.id} className={`flex items-start gap-3 p-4 rounded-2xl border ${
+                                            <div key={tx.id} className={`group relative flex items-start gap-3 p-4 rounded-2xl border transition-all hover:shadow-sm ${
                                                 tx.type === 'charge'
-                                                    ? 'bg-rose-50/60 border-rose-100'
-                                                    : 'bg-emerald-50/60 border-emerald-100'
+                                                    ? 'bg-rose-50/60 border-rose-100 hover:border-rose-200'
+                                                    : 'bg-emerald-50/60 border-emerald-100 hover:border-emerald-200'
                                             }`}>
                                                 <div className={`p-2 rounded-xl shrink-0 ${
                                                     tx.type === 'charge' ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-600'
@@ -309,14 +464,41 @@ export default function Show({ customer, orders, pointHistory, creditTransaction
                                                         }`}>
                                                             {tx.type === 'charge' ? 'CHARGED' : 'PAID'}
                                                         </span>
-                                                        <span className={`text-sm font-black ${tx.type === 'charge' ? 'text-rose-700' : 'text-emerald-700'}`}>
-                                                            {tx.type === 'charge' ? '+' : '-'}{currency}{Number(tx.amount).toFixed(2)}
-                                                        </span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-sm font-black ${tx.type === 'charge' ? 'text-rose-700' : 'text-emerald-700'}`}>
+                                                                {tx.type === 'charge' ? '+' : '-'}{currency}{Number(tx.amount).toFixed(2)}
+                                                            </span>
+                                                            <div className="flex items-center gap-1 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleOpenEditModal(tx)}
+                                                                    className="p-1 rounded-lg hover:bg-white text-gray-500 hover:text-blue-600 transition-colors shadow-none hover:shadow-sm"
+                                                                    title="Edit Transaction"
+                                                                >
+                                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleOpenDeleteModal(tx)}
+                                                                    className="p-1 rounded-lg hover:bg-white text-gray-500 hover:text-rose-600 transition-colors shadow-none hover:shadow-sm"
+                                                                    title="Delete Transaction"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                     <p className="text-xs font-semibold text-gray-600 mt-1 leading-snug">{tx.note || '—'}</p>
-                                                    <p className="text-[10px] font-bold text-gray-400 mt-1">
-                                                        {new Date(tx.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                                                    </p>
+                                                    <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 mt-1">
+                                                        <span>
+                                                            {new Date(tx.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                        </span>
+                                                        {tx.order_id && (
+                                                            <span className="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-black text-[9px]">
+                                                                Order #{tx.order_id}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}
@@ -325,6 +507,14 @@ export default function Show({ customer, orders, pointHistory, creditTransaction
                                     <div className="py-10 text-center">
                                         <BookOpen className="w-12 h-12 text-gray-200 mx-auto mb-3" />
                                         <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No credit activity</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleOpenAddModal('payment')}
+                                            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-gray-700 text-xs font-bold transition-all"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" />
+                                            Add First Entry
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -661,6 +851,372 @@ export default function Show({ customer, orders, pointHistory, creditTransaction
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Edit Credit Transaction Modal ── */}
+            {editingTx && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => !editProcessing && setEditingTx(null)} />
+                    <div className="relative z-10 w-full max-w-md bg-white rounded-[2.5rem] p-8 shadow-2xl duration-200">
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+                                    <Edit2 className="w-5 h-5 text-blue-600" />
+                                    Edit Credit Entry
+                                </h3>
+                                <p className="text-xs font-bold text-gray-500 mt-1">
+                                    Transaction #{editingTx.id} • Customer: {customer.name}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => !editProcessing && setEditingTx(null)}
+                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={submitEditTx} className="space-y-4">
+                            {/* Transaction Type Selector */}
+                            <div>
+                                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                                    Transaction Type
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditType('charge')}
+                                        className={`py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                                            editType === 'charge'
+                                                ? 'bg-rose-500 text-white border-rose-600 shadow-sm'
+                                                : 'bg-slate-50 text-gray-600 border-gray-200 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        Charge (+ Due)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditType('payment')}
+                                        className={`py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                                            editType === 'payment'
+                                                ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm'
+                                                : 'bg-slate-50 text-gray-600 border-gray-200 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        Payment (- Due)
+                                    </button>
+                                </div>
+                                {editErrors.type && <p className="text-red-500 text-xs mt-1 font-bold">{editErrors.type}</p>}
+                            </div>
+
+                            {/* Amount */}
+                            <div>
+                                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                                    Amount ({currency})
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    value={editAmount}
+                                    onChange={e => setEditAmount(e.target.value)}
+                                    className="w-full bg-slate-50 border-none ring-1 ring-gray-200 rounded-2xl px-4 py-3.5 focus:ring-2 focus:ring-blue-500 font-bold transition-all text-sm"
+                                    required
+                                />
+                                {editErrors.amount && <p className="text-red-500 text-xs mt-1 font-bold">{editErrors.amount}</p>}
+                            </div>
+
+                            {/* Date / Time */}
+                            <div>
+                                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                                    Transaction Date & Time
+                                </label>
+                                <input
+                                    type="datetime-local"
+                                    value={editDate}
+                                    onChange={e => setEditDate(e.target.value)}
+                                    className="w-full bg-slate-50 border-none ring-1 ring-gray-200 rounded-2xl px-4 py-3.5 focus:ring-2 focus:ring-blue-500 font-bold transition-all text-sm"
+                                />
+                                {editErrors.created_at && <p className="text-red-500 text-xs mt-1 font-bold">{editErrors.created_at}</p>}
+                            </div>
+
+                            {/* Note */}
+                            <div>
+                                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                                    Note / Reference
+                                </label>
+                                <input
+                                    type="text"
+                                    value={editNote}
+                                    onChange={e => setEditNote(e.target.value)}
+                                    placeholder="e.g. Adjusted wrong amount..."
+                                    className="w-full bg-slate-50 border-none ring-1 ring-gray-200 rounded-2xl px-4 py-3.5 focus:ring-2 focus:ring-blue-500 font-bold transition-all text-sm"
+                                />
+                                {editErrors.note && <p className="text-red-500 text-xs mt-1 font-bold">{editErrors.note}</p>}
+                            </div>
+
+                            {/* Projected Impact Card */}
+                            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1.5">
+                                <div className="flex justify-between text-xs font-bold text-gray-500">
+                                    <span>Current Due:</span>
+                                    <span>{currency}{dueAmount.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs font-black text-gray-900 border-t border-slate-200 pt-1.5">
+                                    <span>Projected New Due:</span>
+                                    <span className={getProjectedDueOnEdit() > 0 ? 'text-rose-600' : 'text-emerald-600'}>
+                                        {currency}{getProjectedDueOnEdit().toFixed(2)}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                                <button
+                                    type="button"
+                                    disabled={editProcessing}
+                                    onClick={() => setEditingTx(null)}
+                                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-gray-700 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={editProcessing}
+                                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-md hover:shadow-blue-300 transition-all disabled:opacity-70 flex items-center justify-center gap-1.5"
+                                >
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    {editProcessing ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Delete Credit Transaction Confirmation Modal ── */}
+            {deletingTx && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => !deleteProcessing && setDeletingTx(null)} />
+                    <div className="relative z-10 w-full max-w-md bg-white rounded-[2.5rem] p-8 shadow-2xl duration-200">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                                <Trash2 className="w-6 h-6" />
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => !deleteProcessing && setDeletingTx(null)}
+                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <h3 className="text-xl font-black text-gray-900 tracking-tight">
+                            Delete Credit Entry?
+                        </h3>
+                        <p className="text-xs text-gray-500 font-medium mt-1">
+                            Are you sure you want to permanently remove this transaction from {customer.name}'s ledger?
+                        </p>
+
+                        <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+                            <div className="flex justify-between text-xs font-bold text-gray-600">
+                                <span>Type:</span>
+                                <span className={`uppercase font-black ${deletingTx.type === 'charge' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                    {deletingTx.type}
+                                </span>
+                            </div>
+                            <div className="flex justify-between text-xs font-bold text-gray-600">
+                                <span>Amount:</span>
+                                <span className="font-black text-gray-900">{currency}{Number(deletingTx.amount).toFixed(2)}</span>
+                            </div>
+                            {deletingTx.note && (
+                                <div className="flex justify-between text-xs font-bold text-gray-600">
+                                    <span>Note:</span>
+                                    <span className="text-gray-800 italic max-w-[200px] truncate">{deletingTx.note}</span>
+                                </div>
+                            )}
+                            {deletingTx.order_id && (
+                                <div className="p-2 rounded-xl bg-blue-50 text-blue-700 text-[11px] font-bold mt-1">
+                                    Originated from Order #{deletingTx.order_id}
+                                </div>
+                            )}
+
+                            <div className="border-t border-slate-200 pt-2 text-xs font-bold">
+                                <span className="text-gray-500">Balance Impact: </span>
+                                {deletingTx.type === 'charge' ? (
+                                    <span className="text-emerald-600 font-black">
+                                        Due will decrease to {currency}{Math.max(0, dueAmount - Number(deletingTx.amount)).toFixed(2)}
+                                    </span>
+                                ) : (
+                                    <span className="text-rose-600 font-black">
+                                        Due will increase to {currency}{(dueAmount + Number(deletingTx.amount)).toFixed(2)}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2 mt-6">
+                            <button
+                                type="button"
+                                disabled={deleteProcessing}
+                                onClick={() => setDeletingTx(null)}
+                                className="flex-1 bg-slate-100 hover:bg-slate-200 text-gray-700 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                disabled={deleteProcessing}
+                                onClick={confirmDeleteTx}
+                                className="flex-1 bg-rose-600 hover:bg-rose-700 text-white py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-md hover:shadow-rose-300 transition-all disabled:opacity-70 flex items-center justify-center gap-1.5"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                {deleteProcessing ? 'Deleting...' : 'Confirm Delete'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Add Manual Credit Entry Modal ── */}
+            {showAddModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => !addProcessing && setShowAddModal(false)} />
+                    <div className="relative z-10 w-full max-w-md bg-white rounded-[2.5rem] p-8 shadow-2xl duration-200">
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+                                    <Plus className="w-5 h-5 text-slate-800" />
+                                    Add Credit Entry
+                                </h3>
+                                <p className="text-xs font-bold text-gray-500 mt-1">
+                                    Manual ledger entry for {customer.name}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => !addProcessing && setShowAddModal(false)}
+                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={submitAddTx} className="space-y-4">
+                            {/* Entry Type Selector */}
+                            <div>
+                                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                                    Entry Type
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAddType('charge')}
+                                        className={`py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                                            addType === 'charge'
+                                                ? 'bg-rose-500 text-white border-rose-600 shadow-sm'
+                                                : 'bg-slate-50 text-gray-600 border-gray-200 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        Charge (+ Due)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAddType('payment')}
+                                        className={`py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                                            addType === 'payment'
+                                                ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm'
+                                                : 'bg-slate-50 text-gray-600 border-gray-200 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        Payment (- Due)
+                                    </button>
+                                </div>
+                                {addErrors.type && <p className="text-red-500 text-xs mt-1 font-bold">{addErrors.type}</p>}
+                            </div>
+
+                            {/* Amount */}
+                            <div>
+                                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                                    Amount ({currency})
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    value={addAmount}
+                                    onChange={e => setAddAmount(e.target.value)}
+                                    placeholder="0.00"
+                                    className="w-full bg-slate-50 border-none ring-1 ring-gray-200 rounded-2xl px-4 py-3.5 focus:ring-2 focus:ring-slate-900 font-bold transition-all text-sm"
+                                    required
+                                />
+                                {addErrors.amount && <p className="text-red-500 text-xs mt-1 font-bold">{addErrors.amount}</p>}
+                            </div>
+
+                            {/* Date */}
+                            <div>
+                                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                                    Date
+                                </label>
+                                <input
+                                    type="date"
+                                    value={addDate}
+                                    onChange={e => setAddDate(e.target.value)}
+                                    className="w-full bg-slate-50 border-none ring-1 ring-gray-200 rounded-2xl px-4 py-3.5 focus:ring-2 focus:ring-slate-900 font-bold transition-all text-sm"
+                                />
+                                {addErrors.date && <p className="text-red-500 text-xs mt-1 font-bold">{addErrors.date}</p>}
+                            </div>
+
+                            {/* Note */}
+                            <div>
+                                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                                    Note / Description
+                                </label>
+                                <input
+                                    type="text"
+                                    value={addNote}
+                                    onChange={e => setAddNote(e.target.value)}
+                                    placeholder="e.g. Opening balance, Direct payment..."
+                                    className="w-full bg-slate-50 border-none ring-1 ring-gray-200 rounded-2xl px-4 py-3.5 focus:ring-2 focus:ring-slate-900 font-bold transition-all text-sm"
+                                />
+                                {addErrors.note && <p className="text-red-500 text-xs mt-1 font-bold">{addErrors.note}</p>}
+                            </div>
+
+                            {/* Projected Impact Card */}
+                            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1.5">
+                                <div className="flex justify-between text-xs font-bold text-gray-500">
+                                    <span>Current Due:</span>
+                                    <span>{currency}{dueAmount.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs font-black text-gray-900 border-t border-slate-200 pt-1.5">
+                                    <span>Projected New Due:</span>
+                                    <span className={getProjectedDueOnAdd() > 0 ? 'text-rose-600' : 'text-emerald-600'}>
+                                        {currency}{getProjectedDueOnAdd().toFixed(2)}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                                <button
+                                    type="button"
+                                    disabled={addProcessing}
+                                    onClick={() => setShowAddModal(false)}
+                                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-gray-700 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={addProcessing}
+                                    className="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-md transition-all disabled:opacity-70 flex items-center justify-center gap-1.5"
+                                >
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    {addProcessing ? 'Adding...' : 'Add Entry'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

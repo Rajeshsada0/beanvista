@@ -31,6 +31,6 @@ class Customer extends Model
 
     public function creditTransactions()
     {
-        return $this->hasMany(CreditTransaction::class)->latest();
+        return $this->hasMany(CreditTransaction::class)->latest('id');
     }
 }

@@ -42,6 +42,8 @@ Route::middleware(ApiTokenAuth::class)->group(function () {
     Route::put('/customers/{id}', [ApiController::class, 'updateCustomer']);
     Route::get('/customers/{id}', [ApiController::class, 'showCustomer']);
     Route::post('/customers/{id}/payment', [ApiController::class, 'recordCustomerPayment']);
+    Route::put('/credit-transactions/{id}', [ApiController::class, 'updateCreditTransaction']);
+    Route::delete('/credit-transactions/{id}', [ApiController::class, 'deleteCreditTransaction']);
     Route::get('/bank-accounts', [ApiController::class, 'bankAccounts']);
     Route::get('/settings', [ApiController::class, 'getSettings']);
     Route::post('/settings', [ApiController::class, 'updateSettings']);

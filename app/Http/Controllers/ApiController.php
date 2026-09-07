@@ -5919,6 +5919,108 @@ class ApiController extends Controller
         ]);
     }
 
+    public function updateCreditTransaction(Request $request, $id)
+    {
+        $transaction = \App\Models\CreditTransaction::findOrFail($id);
+        
+        $validated = $request->validate([
+            'type' => 'required|in:charge,payment',
+            'amount' => 'required|numeric|min:0.01',
+            'note' => 'nullable|string|max:255',
+            'created_at' => 'nullable|date',
+        ]);
+
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $transaction) {
+            $customer = $transaction->customer;
+            $oldType = $transaction->type;
+            $oldAmount = (float)$transaction->amount;
+            $newType = $validated['type'];
+            $newAmount = (float)$validated['amount'];
+
+            // 1. Revert old transaction effect
+            if ($oldType === 'charge') {
+                $customer->due_amount -= $oldAmount;
+            } else {
+                $customer->due_amount += $oldAmount;
+            }
+
+            // 2. Apply new transaction effect
+            if ($newType === 'charge') {
+                $customer->due_amount += $newAmount;
+            } else {
+                $customer->due_amount -= $newAmount;
+            }
+
+            $customer->due_amount = max(0, round($customer->due_amount, 2));
+            $customer->save();
+
+            // 3. Update transaction record
+            $transaction->type = $newType;
+            $transaction->amount = $newAmount;
+            $transaction->note = $validated['note'] ?? null;
+            if (!empty($validated['created_at'])) {
+                $transaction->created_at = $validated['created_at'];
+            }
+            $transaction->save();
+
+            \App\Models\ActivityLog::record(
+                'credit_ledger_updated',
+                "Credit transaction #{$transaction->id} updated for {$customer->name} ({$oldType} {$oldAmount} -> {$newType} {$newAmount}). Updated due: {$customer->due_amount}",
+                $customer
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Credit transaction updated successfully',
+                'data' => [
+                    'due_amount' => (float)$customer->due_amount,
+                    'transaction' => [
+                        'id' => $transaction->id,
+                        'type' => $transaction->type,
+                        'amount' => (float)$transaction->amount,
+                        'note' => $transaction->note,
+                        'created_at' => $transaction->created_at->toIso8601String(),
+                        'time' => $transaction->created_at->diffForHumans(),
+                    ]
+                ]
+            ]);
+        });
+    }
+
+    public function deleteCreditTransaction($id)
+    {
+        $transaction = \App\Models\CreditTransaction::findOrFail($id);
+
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($transaction) {
+            $customer = $transaction->customer;
+            $amount = (float)$transaction->amount;
+            $type = $transaction->type;
+
+            if ($type === 'charge') {
+                $customer->due_amount = max(0, round($customer->due_amount - $amount, 2));
+            } else {
+                $customer->due_amount = round($customer->due_amount + $amount, 2);
+            }
+            $customer->save();
+
+            \App\Models\ActivityLog::record(
+                'credit_ledger_deleted',
+                "Credit transaction #{$transaction->id} ({$type} of {$amount}) deleted for {$customer->name}. Updated due: {$customer->due_amount}",
+                $customer
+            );
+
+            $transaction->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Credit transaction deleted successfully',
+                'data' => [
+                    'due_amount' => (float)$customer->due_amount,
+                ]
+            ]);
+        });
+    }
+
     public function getTableQr(Request $request, $id)
     {
         $table = \App\Models\Table::findOrFail($id);

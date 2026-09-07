@@ -241,6 +241,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('pos/cash-movement', [\App\Http\Controllers\POSController::class, 'cashMovement'])->name('pos.cash-movement');
         Route::resource('customers', \App\Http\Controllers\CustomerController::class);
         Route::post('customers/{customer}/credit-payment', [\App\Http\Controllers\CreditController::class, 'recordPayment'])->name('customers.credit-payment');
+        Route::post('customers/{customer}/credit-transactions', [\App\Http\Controllers\CreditController::class, 'store'])->name('customers.credit-transactions.store');
+        Route::put('credit-transactions/{transaction}', [\App\Http\Controllers\CreditController::class, 'update'])->name('credit-transactions.update');
+        Route::delete('credit-transactions/{transaction}', [\App\Http\Controllers\CreditController::class, 'destroy'])->name('credit-transactions.destroy');
         Route::post('shifts/clock-in', [\App\Http\Controllers\ShiftController::class, 'clockIn'])->name('shifts.clock-in');
         Route::post('shifts/clock-out', [\App\Http\Controllers\ShiftController::class, 'clockOut'])->name('shifts.clock-out');
         Route::get('orders/undefined/edit', function () {
