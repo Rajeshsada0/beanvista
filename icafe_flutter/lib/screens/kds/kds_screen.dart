@@ -1322,23 +1322,25 @@ class _GroupedOrderCard extends StatelessWidget {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Left solid blue vertical accent bar
-            Container(
-              width: 4.5,
+      child: Stack(
+        children: [
+          // Left solid blue vertical accent bar
+          Positioned(
+            top: 0,
+            bottom: 0,
+            left: 0,
+            width: 4.5,
+            child: Container(
               color: const Color(0xFF2563EB),
             ),
+          ),
 
-            // Card Inner Content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+          // Card Inner Content
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                     // Header Row: Table Badge, Order Info & Elapsed Timer Pill
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1482,21 +1484,19 @@ class _GroupedOrderCard extends StatelessWidget {
                     const SizedBox(height: 14),
 
                     // Items List
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: orderGroup.items.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final item = orderGroup.items[index];
-                        final removing = removingIds.contains(item.id);
-
-                        return AnimatedOpacity(
-                          duration: const Duration(milliseconds: 300),
-                          opacity: removing ? 0.0 : 1.0,
-                          child: _buildItemRow(context, item),
-                        );
-                      },
+                    Column(
+                      children: [
+                        for (int index = 0; index < orderGroup.items.length; index++) ...[
+                          if (index > 0) const SizedBox(height: 10),
+                          AnimatedOpacity(
+                            duration: const Duration(milliseconds: 300),
+                            opacity: removingIds.contains(orderGroup.items[index].id)
+                                ? 0.0
+                                : 1.0,
+                            child: _buildItemRow(context, orderGroup.items[index]),
+                          ),
+                        ],
+                      ],
                     ),
 
                     const SizedBox(height: 14),
@@ -1786,12 +1786,10 @@ class _GroupedOrderCard extends StatelessWidget {
                   ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+            ],
+          ),
+        );
+      }
 
   Widget _buildItemRow(BuildContext context, KdsItem item) {
     return Row(
@@ -1969,22 +1967,24 @@ class _KdsCard extends StatelessWidget {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Left Blue Stripe
-            Container(
-              width: 4.5,
+      child: Stack(
+        children: [
+          // Left Blue Stripe
+          Positioned(
+            top: 0,
+            bottom: 0,
+            left: 0,
+            width: 4.5,
+            child: Container(
               color: const Color(0xFF2563EB),
             ),
+          ),
 
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                     // Header Row: Table Badge, Order Number & Elapsed Timer Pill
                     Row(
                       children: [
@@ -2253,10 +2253,8 @@ class _KdsCard extends StatelessWidget {
                   ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+            ],
+          ),
+        );
+      }
 }
