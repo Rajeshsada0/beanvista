@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, useForm, usePage, router } from '@inertiajs/react';
 import { Plus, Users, Clock, Coffee, CheckCircle2, X, QrCode, Search, LayoutGrid, List, Download, Copy, Check, AlertTriangle, Lock, Unlock, Info } from 'lucide-react';
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import QRCode from 'qrcode';
@@ -179,6 +179,12 @@ export default function TableBook({ tables, menus, activeSession, cashSales, cas
         e.preventDefault();
         post(route('tables.store'), {
             onSuccess: () => { setIsAddModalOpen(false); reset(); }
+        });
+    };
+
+    const handleReleaseTable = (tableId) => {
+        router.put(route('tables.update', tableId), { status: 'available' }, {
+            preserveScroll: true,
         });
     };
 
@@ -376,20 +382,47 @@ export default function TableBook({ tables, menus, activeSession, cashSales, cas
                                     )}
                                     {table.status === 'occupied' && (
                                         <div className="flex flex-col gap-1">
-                                            {table.orders[0]?.customer && (
+                                            {table.orders?.[0]?.customer && (
                                                 <p className="text-[10px] font-bold text-gray-500 truncate">{table.orders[0].customer.name}</p>
                                             )}
-                                            <div className="flex items-center justify-between mb-1">
-                                                <span className="text-[9px] font-bold text-red-500 uppercase">Active Order</span>
-                                                <span className="text-[11px] font-black text-red-700">{currency} {table.orders[0]?.total_amount || '0.00'}</span>
-                                            </div>
-                                            <Link
-                                                href={`/orders/${table.orders[0]?.id}/edit`}
-                                                className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-sm transition-all"
-                                            >
-                                                <Coffee className="w-3.5 h-3.5" />
-                                                Manage Order
-                                            </Link>
+                                            {table.orders?.[0]?.id ? (
+                                                <>
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="text-[9px] font-bold text-red-500 uppercase">Active Order</span>
+                                                        <span className="text-[11px] font-black text-red-700">{currency} {table.orders[0]?.total_amount || '0.00'}</span>
+                                                    </div>
+                                                    <Link
+                                                        href={`/orders/${table.orders[0].id}/edit`}
+                                                        className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-sm transition-all"
+                                                    >
+                                                        <Coffee className="w-3.5 h-3.5" />
+                                                        Manage Order
+                                                    </Link>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="text-[9px] font-bold text-amber-600 uppercase">No Active Order</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-1.5">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleReleaseTable(table.id)}
+                                                            className="flex items-center justify-center gap-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all"
+                                                        >
+                                                            <CheckCircle2 className="w-3.5 h-3.5" />
+                                                            Free
+                                                        </button>
+                                                        <Link
+                                                            href={route('orders.create', { table_id: table.id })}
+                                                            className="flex items-center justify-center gap-1 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold transition-all"
+                                                        >
+                                                            <Coffee className="w-3.5 h-3.5" />
+                                                            Order
+                                                        </Link>
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -431,11 +464,14 @@ export default function TableBook({ tables, menus, activeSession, cashSales, cas
                                         <td className="px-4 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">
                                             {table.status === 'occupied'
                                                 ? <span className="flex items-center gap-2 whitespace-nowrap">
-                                                    {table.orders[0]?.customer
+                                                    {table.orders?.[0]?.customer
                                                         ? <span className="font-bold text-gray-800 whitespace-nowrap">{table.orders[0].customer.name}</span>
                                                         : <span className="text-gray-400">—</span>
                                                     }
-                                                    <span className="text-red-600 font-black whitespace-nowrap">{currency} {table.orders[0]?.total_amount || '0.00'}</span>
+                                                    {table.orders?.[0]?.id
+                                                        ? <span className="text-red-600 font-black whitespace-nowrap">{currency} {table.orders[0]?.total_amount || '0.00'}</span>
+                                                        : <span className="text-amber-600 font-bold text-[10px] whitespace-nowrap">No Order</span>
+                                                    }
                                                   </span>
                                                 : <span className="text-gray-400">—</span>
                                             }
@@ -460,12 +496,30 @@ export default function TableBook({ tables, menus, activeSession, cashSales, cas
                                                 </div>
                                             )}
                                             {table.status === 'occupied' && (
-                                                <Link
-                                                    href={`/orders/${table.orders[0]?.id}/edit`}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-sm transition-all whitespace-nowrap"
-                                                >
-                                                    <Coffee className="w-3.5 h-3.5" />Manage
-                                                </Link>
+                                                table.orders?.[0]?.id ? (
+                                                    <Link
+                                                        href={`/orders/${table.orders[0].id}/edit`}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-sm transition-all whitespace-nowrap"
+                                                    >
+                                                        <Coffee className="w-3.5 h-3.5" />Manage
+                                                    </Link>
+                                                ) : (
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleReleaseTable(table.id)}
+                                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all whitespace-nowrap"
+                                                        >
+                                                            <CheckCircle2 className="w-3.5 h-3.5" />Free Table
+                                                        </button>
+                                                        <Link
+                                                            href={route('orders.create', { table_id: table.id })}
+                                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold transition-all whitespace-nowrap"
+                                                        >
+                                                            <Coffee className="w-3.5 h-3.5" />New Order
+                                                        </Link>
+                                                    </div>
+                                                )
                                             )}
                                         </td>
                                     </tr>

@@ -11,28 +11,23 @@ class TableController extends Controller
     {
         $tables = \App\Models\Table::with([
             'orders' => function($q) {
-                $q->where(function($query) {
-                    $query->whereNotIn('status', ['completed', 'cancelled'])
-                          ->orWhere(function($sub) {
-                              $sub->where('status', 'completed')
-                                  ->where('created_at', '>=', now()->subHours(24))
-                                  ->whereHas('items', function($ki) {
-                                      $ki->where(function($k) {
-                                          $k->whereNull('kds_status')
-                                            ->orWhereNotIn('kds_status', ['delivered']);
-                                      });
-                                  });
-                          });
-                })->with(['customer', 'items']);
+                $q->whereNotIn('status', ['completed', 'cancelled'])->with(['customer', 'items']);
             },
             'reservations' => function($q) {
                 $q->where('status', 'active');
             }
         ])->get();
 
-        // Auto-cleanup: Ensure table status matches actual active orders
+        // Auto-heal status for any desynchronized table
         foreach ($tables as $table) {
-            \App\Models\Table::syncStatus($table->id);
+            $activeOrder = $table->orders->first();
+            if ($table->status === 'occupied' && !$activeOrder) {
+                $table->update(['status' => 'available']);
+                $table->status = 'available';
+            } elseif ($table->status === 'available' && $activeOrder) {
+                $table->update(['status' => 'occupied']);
+                $table->status = 'occupied';
+            }
         }
 
         $activeSession = \App\Models\CashRegisterSession::where('tenant_id', auth()->user()->tenant_id)
@@ -109,6 +104,7 @@ class TableController extends Controller
         $branchId = session('active_branch_id') ?: auth()->user()->primary_branch_id;
         $validated = $request->validate([
             'table_number' => [
+                'sometimes',
                 'required',
                 'string',
                 \Illuminate\Validation\Rule::unique('tables')->ignore($table->id)->where(function ($query) use ($branchId) {
@@ -116,8 +112,8 @@ class TableController extends Controller
                                  ->where('branch_id', $branchId);
                 })
             ],
-            'capacity' => 'required|integer|min:1',
-            'status' => 'required|in:available,reserved,occupied'
+            'capacity' => 'sometimes|required|integer|min:1',
+            'status' => 'sometimes|required|in:available,reserved,occupied'
         ]);
 
         $table->update($validated);

@@ -243,6 +243,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('customers/{customer}/credit-payment', [\App\Http\Controllers\CreditController::class, 'recordPayment'])->name('customers.credit-payment');
         Route::post('shifts/clock-in', [\App\Http\Controllers\ShiftController::class, 'clockIn'])->name('shifts.clock-in');
         Route::post('shifts/clock-out', [\App\Http\Controllers\ShiftController::class, 'clockOut'])->name('shifts.clock-out');
+        Route::get('orders/undefined/edit', function () {
+            return redirect()->route('table-book')->with('error', 'Invalid order. Table has no active order.');
+        });
+        Route::get('orders/undefined', function () {
+            return redirect()->route('table-book')->with('error', 'Invalid order.');
+        });
         Route::resource('orders', \App\Http\Controllers\OrderController::class);
         Route::get('orders/{order}/receipt', [\App\Http\Controllers\OrderController::class, 'receipt'])->name('orders.receipt');
     });
