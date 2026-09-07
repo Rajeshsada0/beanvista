@@ -118,7 +118,6 @@ class KdsScreen extends StatefulWidget {
 
 class _KdsScreenState extends State<KdsScreen> {
   List<KdsItem> _items = [];
-  String _selectedFilter = 'All';
   
   // Search, Sort, Selected Item Filter and View Mode States
   final TextEditingController _searchController = TextEditingController();
@@ -238,12 +237,7 @@ class _KdsScreenState extends State<KdsScreen> {
   List<KdsItem> get _filteredAndSearched {
     List<KdsItem> list = _items;
     
-    // 1. Status Filter Tab
-    if (_selectedFilter != 'All') {
-      list = list.where((e) => e.status == _selectedFilter.toLowerCase()).toList();
-    }
-    
-    // 2. Active Item Pill Filter
+    // 1. Active Item Pill Filter
     if (_selectedItemNameFilter != null) {
       list = list.where((e) => e.item == _selectedItemNameFilter).toList();
     }
@@ -433,8 +427,7 @@ class _KdsScreenState extends State<KdsScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _kitetoolHeaderBanner(),
-          _controlBar(),
+          _buildControlHeader(context),
           if (hasActiveItems) _activeQuantitiesBar(),
           Expanded(
             child: _viewMode == 'order'
@@ -446,146 +439,316 @@ class _KdsScreenState extends State<KdsScreen> {
     );
   }
 
-  // ─── Header Banner (Kitetool Design) ──────────
-  Widget _kitetoolHeaderBanner() {
+  // ─── Unified Responsive Control Header ──────
+  Widget _buildControlHeader(BuildContext context) {
     final app = Provider.of<AppProvider>(context);
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Row 1: Title + Subtitle
-          Text(
-            'Kitchen Display System',
-            style: GoogleFonts.poppins(
-              color: AppColors.isDark ? Colors.white : const Color(0xFF0F172A),
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Live order preparation tracking',
-            style: GoogleFonts.poppins(
-              color: const Color(0xFF64748B),
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 12),
+    final isDark = AppColors.isDark;
 
-          // Row 2: View Switcher + Critical Badge + Moon + Clock
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              // Segmented View Toggle (Order View vs Item View)
-              Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: AppColors.isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _viewModeButton('order', 'Order View', Icons.tune_rounded),
-                    _viewModeButton('item', 'Item View', Icons.local_cafe_rounded),
-                  ],
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final isCompact = w < 480;
+
+        return Container(
+          margin: const EdgeInsets.fromLTRB(14, 8, 14, 6),
+          padding: EdgeInsets.all(isCompact ? 10 : 12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Row 1: View Mode Switcher + Critical Badge (Left) & Clock + Theme Toggle (Right)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Left side: View Mode Switcher + Critical
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _viewModeButton('order', isCompact ? 'Orders' : 'Order View', Icons.tune_rounded),
+                              _viewModeButton('item', isCompact ? 'Items' : 'Item View', Icons.local_cafe_rounded),
+                            ],
+                          ),
+                        ),
 
-              // Critical Badge
-              if (_criticalCount > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEE2E2), // Soft pink red
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFFCA5A5)),
+                        if (_criticalCount > 0) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEE2E2),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFFCA5A5)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('🔥 ', style: TextStyle(fontSize: 11)),
+                                Text(
+                                  isCompact ? '$_criticalCount' : '$_criticalCount Critical',
+                                  style: GoogleFonts.poppins(
+                                    color: const Color(0xFFDC2626),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                  child: Row(
+
+                  // Right side: Clock Capsule & Theme Toggle
+                  Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('🔥 ', style: TextStyle(fontSize: 12)),
-                      Text(
-                        '$_criticalCount Critical',
-                        style: GoogleFonts.poppins(
-                          color: const Color(0xFFDC2626),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.access_time_rounded, color: Color(0xFF64748B), size: 13),
+                            const SizedBox(width: 5),
+                            Text(
+                              _clockText(_now),
+                              style: GoogleFonts.poppins(
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: () => app.setDarkMode(!app.isDarkMode),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            app.isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                            size: 15,
+                            color: isDark ? const Color(0xFFF59E0B) : const Color(0xFF64748B),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
-
-              // Theme Mode Toggle Icon
-              InkWell(
-                onTap: () => app.setDarkMode(!app.isDarkMode),
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    app.isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-                    size: 16,
-                    color: AppColors.isDark ? const Color(0xFFF59E0B) : const Color(0xFF64748B),
-                  ),
-                ),
+                ],
               ),
 
-              // Clock Capsule
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: AppColors.isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.access_time_rounded, color: Color(0xFF64748B), size: 14),
-                    const SizedBox(width: 6),
-                    Text(
-                      _clockText(_now),
-                      style: GoogleFonts.poppins(
-                        color: AppColors.isDark ? Colors.white : const Color(0xFF0F172A),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
+              const SizedBox(height: 10),
+
+              // Row 2: Search Input & Sort Dropdown in one managed responsive row
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (val) => setState(() => _searchQuery = val),
+                        style: GoogleFonts.poppins(
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          fontSize: 12,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: isCompact ? 'Search table, order...' : 'Search table, order, or item...',
+                          hintStyle: GoogleFonts.poppins(
+                            color: const Color(0xFF94A3B8),
+                            fontSize: 12,
+                          ),
+                          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 18),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_rounded, color: Color(0xFF94A3B8), size: 16),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Sort Dropdown Button
+                  PopupMenuButton<String>(
+                    onSelected: (val) => setState(() => _selectedSort = val),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'oldest',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.history_rounded,
+                              size: 16,
+                              color: _selectedSort == 'oldest' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Oldest First (FIFO)',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                fontWeight: _selectedSort == 'oldest' ? FontWeight.w700 : FontWeight.w500,
+                                color: _selectedSort == 'oldest' ? const Color(0xFF2563EB) : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'newest',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.update_rounded,
+                              size: 16,
+                              color: _selectedSort == 'newest' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Newest First',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                fontWeight: _selectedSort == 'newest' ? FontWeight.w700 : FontWeight.w500,
+                                color: _selectedSort == 'newest' ? const Color(0xFF2563EB) : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'urgent',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.local_fire_department_rounded,
+                              size: 16,
+                              color: _selectedSort == 'urgent' ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Urgent First',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                fontWeight: _selectedSort == 'urgent' ? FontWeight.w700 : FontWeight.w500,
+                                color: _selectedSort == 'urgent' ? const Color(0xFFDC2626) : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    child: Container(
+                      height: 40,
+                      padding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 12),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.swap_vert_rounded, size: 16, color: Color(0xFF64748B)),
+                          const SizedBox(width: 4),
+                          Text(
+                            _getSortLabel(isCompact),
+                            style: GoogleFonts.poppins(
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF64748B)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
+  }
+
+  String _getSortLabel(bool isCompact) {
+    if (isCompact) {
+      switch (_selectedSort) {
+        case 'newest':
+          return 'Newest';
+        case 'urgent':
+          return 'Urgent';
+        case 'oldest':
+        default:
+          return 'Oldest';
+      }
+    } else {
+      switch (_selectedSort) {
+        case 'newest':
+          return 'Newest First';
+        case 'urgent':
+          return 'Urgent First';
+        case 'oldest':
+        default:
+          return 'Sort: Oldest (FIFO)';
+      }
+    }
   }
 
   Widget _viewModeButton(String mode, String label, IconData icon) {
@@ -598,7 +761,7 @@ class _KdsScreenState extends State<KdsScreen> {
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
               ? (AppColors.isDark ? const Color(0xFF334155) : Colors.white)
@@ -619,12 +782,12 @@ class _KdsScreenState extends State<KdsScreen> {
           children: [
             Icon(
               icon,
-              size: 14,
+              size: 13,
               color: isSelected
                   ? (AppColors.isDark ? Colors.white : const Color(0xFF0F172A))
                   : const Color(0xFF64748B),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
             Text(
               label,
               style: GoogleFonts.poppins(
@@ -637,115 +800,6 @@ class _KdsScreenState extends State<KdsScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  // ─── Control Bar (Search & Sort) ─────────────
-  Widget _controlBar() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-        ),
-      ),
-      child: Column(
-        children: [
-          // Search Input
-          Container(
-            height: 42,
-            decoration: BoxDecoration(
-              color: AppColors.isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-              ),
-            ),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (val) => setState(() => _searchQuery = val),
-              style: GoogleFonts.poppins(
-                color: AppColors.isDark ? Colors.white : const Color(0xFF0F172A),
-                fontSize: 12,
-              ),
-              decoration: InputDecoration(
-                hintText: 'Search table, order, or item...',
-                hintStyle: GoogleFonts.poppins(
-                  color: const Color(0xFF94A3B8),
-                  fontSize: 12,
-                ),
-                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 18),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear_rounded, color: Color(0xFF94A3B8), size: 18),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          
-          // Sort Dropdown Pill
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              PopupMenuButton<String>(
-                onSelected: (val) => setState(() => _selectedSort = val),
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'oldest',
-                    child: Text('Oldest First (FIFO)', style: GoogleFonts.poppins(fontSize: 12)),
-                  ),
-                  PopupMenuItem(
-                    value: 'newest',
-                    child: Text('Newest First', style: GoogleFonts.poppins(fontSize: 12)),
-                  ),
-                  PopupMenuItem(
-                    value: 'urgent',
-                    child: Text('Urgent First', style: GoogleFonts.poppins(fontSize: 12)),
-                  ),
-                ],
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: AppColors.isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.swap_vert_rounded, size: 14, color: Color(0xFF64748B)),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Sort: ${_selectedSort == 'oldest' ? 'Oldest First (FIFO)' : (_selectedSort == 'newest' ? 'Newest First' : 'Urgent First')}',
-                        style: GoogleFonts.poppins(
-                          color: AppColors.isDark ? Colors.white : const Color(0xFF0F172A),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF64748B)),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -924,24 +978,67 @@ class _KdsScreenState extends State<KdsScreen> {
 
   Widget _buildIndividualItemGrid(int cols) {
     final itemsList = _sortedItems;
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      itemCount: itemsList.length,
-      itemBuilder: (_, i) {
-        final item = itemsList[i];
-        final removing = _removingIds.contains(item.id);
-        return AnimatedOpacity(
-          duration: const Duration(milliseconds: 400),
-          opacity: removing ? 0.0 : 1.0,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _KdsCard(
-              item: item,
-              onAdvance: () => _advance(item),
+    if (cols <= 1) {
+      return ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        itemCount: itemsList.length,
+        itemBuilder: (_, i) {
+          final item = itemsList[i];
+          final removing = _removingIds.contains(item.id);
+          return AnimatedOpacity(
+            duration: const Duration(milliseconds: 400),
+            opacity: removing ? 0.0 : 1.0,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _KdsCard(
+                item: item,
+                onAdvance: () => _advance(item),
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      );
+    }
+
+    final List<List<KdsItem>> columnsData = List.generate(cols, (_) => []);
+    for (int i = 0; i < itemsList.length; i++) {
+      columnsData[i % cols].add(itemsList[i]);
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: List.generate(cols, (colIndex) {
+          final columnItems = columnsData[colIndex];
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: colIndex == 0 ? 0 : 6,
+                right: colIndex == cols - 1 ? 0 : 6,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: columnItems.map((item) {
+                  final removing = _removingIds.contains(item.id);
+                  return AnimatedOpacity(
+                    duration: const Duration(milliseconds: 400),
+                    opacity: removing ? 0.0 : 1.0,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _KdsCard(
+                        item: item,
+                        onAdvance: () => _advance(item),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          );
+        }),
+      ),
     );
   }
 
@@ -1287,59 +1384,75 @@ class _GroupedOrderCard extends StatelessWidget {
     final preparingItems = orderGroup.items.where((i) => i.status == 'preparing').toList();
     final totalCount = orderGroup.items.length;
 
-    return Row(
-      children: [
-        // Prepare All (4)
-        Expanded(
-          child: SizedBox(
-            height: 38,
-            child: ElevatedButton.icon(
-              onPressed: pendingItems.isNotEmpty
-                  ? () => onBulkUpdateStatus(pendingItems, 'preparing')
-                  : null,
-              icon: const Icon(Icons.play_arrow_rounded, size: 16),
-              label: Text(
-                'Prepare All ($totalCount)',
-                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w800),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEFF6FF), // Light blue
-                foregroundColor: const Color(0xFF2563EB), // Royal blue
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 260;
+        final prepareLabel = isNarrow ? 'Prep ($totalCount)' : 'Prepare All ($totalCount)';
+        final readyLabel = isNarrow ? 'Ready ($totalCount)' : 'Ready All ($totalCount)';
+
+        return Row(
+          children: [
+            // Prepare All
+            Expanded(
+              child: SizedBox(
+                height: 38,
+                child: ElevatedButton.icon(
+                  onPressed: pendingItems.isNotEmpty
+                      ? () => onBulkUpdateStatus(pendingItems, 'preparing')
+                      : null,
+                  icon: const Icon(Icons.play_arrow_rounded, size: 15),
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      prepareLabel,
+                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEFF6FF), // Light blue
+                    foregroundColor: const Color(0xFF2563EB), // Royal blue
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        
-        // Ready All (4)
-        Expanded(
-          child: SizedBox(
-            height: 38,
-            child: ElevatedButton.icon(
-              onPressed: (preparingItems.isNotEmpty || pendingItems.isNotEmpty)
-                  ? () => onBulkUpdateStatus([...preparingItems, ...pendingItems], 'ready')
-                  : null,
-              icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
-              label: Text(
-                'Ready All ($totalCount)',
-                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w800),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF059669), // Solid green
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+            const SizedBox(width: 8),
+            
+            // Ready All
+            Expanded(
+              child: SizedBox(
+                height: 38,
+                child: ElevatedButton.icon(
+                  onPressed: (preparingItems.isNotEmpty || pendingItems.isNotEmpty)
+                      ? () => onBulkUpdateStatus([...preparingItems, ...pendingItems], 'ready')
+                      : null,
+                  icon: const Icon(Icons.check_circle_outline_rounded, size: 15),
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      readyLabel,
+                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF059669), // Solid green
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 }
