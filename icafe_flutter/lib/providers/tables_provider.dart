@@ -98,8 +98,8 @@ class TablesProvider extends ChangeNotifier {
 
   Future<bool> updateTable(
     int tableId, {
-    required String tableNumber,
-    required int capacity,
+    String? tableNumber,
+    int? capacity,
     required String status,
   }) async {
     _isLoading = true;
@@ -107,11 +107,11 @@ class TablesProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiService.put('/tables/$tableId', {
-        'table_number': tableNumber,
-        'capacity': capacity,
-        'status': status,
-      });
+      final Map<String, dynamic> payload = {'status': status};
+      if (tableNumber != null) payload['table_number'] = tableNumber;
+      if (capacity != null) payload['capacity'] = capacity;
+
+      final response = await _apiService.put('/tables/$tableId', payload);
       _isLoading = false;
       if (response != null && response['success'] == true) {
         await fetchTables();
@@ -123,6 +123,37 @@ class TablesProvider extends ChangeNotifier {
       }
     } catch (e) {
       _error = 'Failed to update table: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> releaseTable(int tableId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.put('/tables/$tableId', {
+        'status': 'available',
+      });
+      _isLoading = false;
+      if (response != null && response['success'] == true) {
+        _apiService.logActivity(
+          'Table Released',
+          'Table #$tableId marked as available',
+          type: 'table',
+        );
+        await fetchTables();
+        return true;
+      } else {
+        _error = response?['message'] ?? 'Failed to release table';
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = 'Failed to release table: $e';
       _isLoading = false;
       notifyListeners();
       return false;

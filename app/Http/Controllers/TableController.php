@@ -30,31 +30,9 @@ class TableController extends Controller
             }
         ])->get();
 
-        // Auto-cleanup: If an occupied table has no actual order items, free it
+        // Auto-cleanup: Ensure table status matches actual active orders
         foreach ($tables as $table) {
-            if ($table->status === 'occupied') {
-                // If there's a completed order with pending kitchen items, don't clean it up
-                $hasCompletedWithPendingItems = \App\Models\Order::where('table_id', $table->id)
-                    ->where('status', 'completed')
-                    ->where('created_at', '>=', now()->subHours(24))
-                    ->whereHas('items', function ($query) {
-                        $query->where(function ($q) {
-                            $q->whereNull('kds_status')
-                              ->orWhereNotIn('kds_status', ['delivered']);
-                        });
-                    })
-                    ->exists();
-
-                if ($hasCompletedWithPendingItems) {
-                    continue;
-                }
-
-                $activeOrder = $table->orders->first();
-                if (!$activeOrder || $activeOrder->items->count() === 0) {
-                    if ($activeOrder) $activeOrder->delete();
-                    $table->update(['status' => 'available']);
-                }
-            }
+            \App\Models\Table::syncStatus($table->id);
         }
 
         $activeSession = \App\Models\CashRegisterSession::where('tenant_id', auth()->user()->tenant_id)

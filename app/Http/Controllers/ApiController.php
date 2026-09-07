@@ -561,15 +561,26 @@ class ApiController extends Controller
      */
     public function tables()
     {
-        $tables = Table::with(['activeOrders.items'])->get();
+        $tables = Table::with(['activeOrders.items', 'activeOrders.waiter'])->get();
         
         $tablesData = $tables->map(function($t) {
             $activeOrder = $t->activeOrders->first();
+            $status = $t->status;
+
+            // Auto-heal status if table is marked occupied but has no active orders
+            if ($status === 'occupied' && !$activeOrder) {
+                $t->update(['status' => 'available']);
+                $status = 'available';
+            } elseif ($status === 'available' && $activeOrder) {
+                $t->update(['status' => 'occupied']);
+                $status = 'occupied';
+            }
+
             return [
                 'id' => $t->id,
                 'number' => $t->table_number,
                 'capacity' => $t->capacity,
-                'status' => $t->status,
+                'status' => $status,
                 'order' => $activeOrder ? [
                     'id' => $activeOrder->id,
                     'number' => $activeOrder->order_number,
@@ -644,6 +655,7 @@ class ApiController extends Controller
             $branchId = session('active_branch_id') ?: auth()->user()->primary_branch_id;
             $validated = $request->validate([
                 'table_number' => [
+                    'sometimes',
                     'required',
                     'string',
                     \Illuminate\Validation\Rule::unique('tables')->ignore($table->id)->where(function ($query) use ($branchId) {
@@ -651,15 +663,11 @@ class ApiController extends Controller
                                      ->where('branch_id', $branchId);
                     })
                 ],
-                'capacity' => 'required|integer|min:1',
-                'status' => 'required|in:available,reserved,occupied'
+                'capacity' => 'sometimes|required|integer|min:1',
+                'status' => 'sometimes|required|in:available,reserved,occupied'
             ]);
 
-            $table->update([
-                'table_number' => $validated['table_number'],
-                'capacity' => $validated['capacity'],
-                'status' => $validated['status'],
-            ]);
+            $table->update($validated);
 
             return response()->json([
                 'success' => true,
@@ -1722,6 +1730,15 @@ class ApiController extends Controller
                         }
                     }
 
+                    // Mark any pending or non-delivered items as delivered
+                    $order->items()->where(function($q) {
+                        $q->whereNull('kds_status')
+                          ->orWhereNotIn('kds_status', ['delivered', 'cancelled']);
+                    })->update([
+                        'kds_status' => 'delivered',
+                        'delivered_at' => now(),
+                    ]);
+
                     // Sync table status
                     if ($order->table_id) {
                         $table = Table::find($order->table_id);
@@ -1780,6 +1797,15 @@ class ApiController extends Controller
                     // Record Accounting Journal Entries for Sales and COGS
                     $this->recordAccountingEntries($order);
                 }
+            }
+
+            if (isset($validated['status']) && $validated['status'] === 'cancelled') {
+                $order->items()->where(function($q) {
+                    $q->whereNull('kds_status')
+                      ->orWhereNotIn('kds_status', ['delivered', 'cancelled']);
+                })->update([
+                    'kds_status' => 'cancelled',
+                ]);
             }
 
             $order->save();

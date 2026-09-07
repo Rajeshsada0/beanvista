@@ -33,11 +33,7 @@ class Table extends Model
             return;
         }
 
-        // A table is occupied if it has any orders that:
-        // 1. Are active (status not in completed, cancelled)
-        // OR
-        // 2. Are completed (paid) but have items that are not fully delivered yet.
-        
+        // A table is occupied if it has any active orders (status not completed or cancelled)
         $hasActiveOrders = \App\Models\Order::withoutGlobalScopes()
             ->where('table_id', $tableId)
             ->whereNotIn('status', ['completed', 'cancelled'])
@@ -48,20 +44,16 @@ class Table extends Model
             return;
         }
 
-        $hasCompletedButNotDeliveredOrders = \App\Models\Order::withoutGlobalScopes()
+        // If no active orders, check for any active reservation around current time
+        $hasActiveReservation = \App\Models\Reservation::withoutGlobalScopes()
             ->where('table_id', $tableId)
-            ->where('status', 'completed')
-            ->where('created_at', '>=', now()->subHours(24))
-            ->whereHas('items', function ($query) {
-                $query->where(function ($q) {
-                    $q->whereNull('kds_status')
-                      ->orWhereNotIn('kds_status', ['delivered']);
-                });
-            })
+            ->where('status', 'active')
+            ->where('booking_time', '>=', now()->subHours(1))
+            ->where('booking_time', '<=', now()->addHours(2))
             ->exists();
 
-        if ($hasCompletedButNotDeliveredOrders) {
-            self::withoutGlobalScopes()->where('id', $tableId)->update(['status' => 'occupied']);
+        if ($hasActiveReservation) {
+            self::withoutGlobalScopes()->where('id', $tableId)->update(['status' => 'reserved']);
         } else {
             self::withoutGlobalScopes()->where('id', $tableId)->update(['status' => 'available']);
         }

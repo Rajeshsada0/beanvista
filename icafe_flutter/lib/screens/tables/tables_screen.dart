@@ -284,53 +284,97 @@ class _TablesScreenState extends State<TablesScreen> {
               ),
               const SizedBox(height: 6),
               // Status info
-              if (isOccupied && table['order'] != null) ...[
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.statusRedBg,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '${AppConstants.currencySymbol} ${JsonUtils.parseDouble(table['order']['total']).toStringAsFixed(0)}',
-                    style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      color: AppColors.tableOccupied,
-                      fontWeight: FontWeight.w700,
+              if (isOccupied) ...[
+                if (table['order'] != null) ...[
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.statusRedBg,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '${AppConstants.currencySymbol} ${JsonUtils.parseDouble(table['order']['total']).toStringAsFixed(0)}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        color: AppColors.tableOccupied,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${table['order']['items']} items',
-                  style: GoogleFonts.poppins(
-                      fontSize: 9, color: AppColors.textMuted),
-                ),
-              ] else if (isReserved && table['reservation'] != null) ...[
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.statusAmberBg,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    table['reservation']['time'],
+                  const SizedBox(height: 2),
+                  Text(
+                    '${table['order']['items']} items',
                     style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      color: AppColors.tableReserved,
-                      fontWeight: FontWeight.w700,
+                        fontSize: 9, color: AppColors.textMuted),
+                  ),
+                ] else ...[
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.statusRedBg,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Occupied',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        color: AppColors.tableOccupied,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  table['reservation']['name'],
-                  style: GoogleFonts.poppins(
-                      fontSize: 9, color: AppColors.textMuted),
-                  overflow: TextOverflow.ellipsis,
-                ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'No active order',
+                    style: GoogleFonts.poppins(
+                        fontSize: 9, color: AppColors.textMuted),
+                  ),
+                ],
+              ] else if (isReserved) ...[
+                if (table['reservation'] != null) ...[
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.statusAmberBg,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      table['reservation']['time'],
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        color: AppColors.tableReserved,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    table['reservation']['name'],
+                    style: GoogleFonts.poppins(
+                        fontSize: 9, color: AppColors.textMuted),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ] else ...[
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.statusAmberBg,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Reserved',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        color: AppColors.tableReserved,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ] else ...[
                 Container(
                   padding:
@@ -420,6 +464,21 @@ class _TablesScreenState extends State<TablesScreen> {
                     _showTableFormSheet(table: table);
                   },
                 ),
+                if (status == 'occupied')
+                  IconButton(
+                    tooltip: 'Free Table',
+                    icon: Icon(Icons.cleaning_services_rounded, color: AppColors.statusGreen, size: 20),
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      final success = await context.read<TablesProvider>().releaseTable(table['id'] as int);
+                      if (mounted && success) {
+                        showTopSnackBar(context, SnackBar(
+                          content: Text('Table ${table['number']} is now Available!', style: GoogleFonts.poppins()),
+                          backgroundColor: AppColors.statusGreen,
+                        ));
+                      }
+                    },
+                  ),
                 if (context.read<AppProvider>().enableGuestQr)
                   IconButton(
                     icon: const Icon(Icons.qr_code_rounded, color: Colors.blueAccent, size: 20),
@@ -482,6 +541,96 @@ class _TablesScreenState extends State<TablesScreen> {
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final success = await context.read<TablesProvider>().releaseTable(table['id'] as int);
+                    if (mounted && success) {
+                      showTopSnackBar(context, SnackBar(
+                        content: Text('Table ${table['number']} marked as Available!', style: GoogleFonts.poppins()),
+                        backgroundColor: AppColors.statusGreen,
+                      ));
+                    }
+                  },
+                  icon: Icon(Icons.cleaning_services_rounded, size: 16, color: AppColors.statusGreen),
+                  label: Text('Release / Free Table', style: GoogleFonts.poppins(color: AppColors.statusGreen, fontSize: 13, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ] else if (status == 'occupied' && table['order'] == null) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.statusAmberBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.tableReserved.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: AppColors.tableReserved, size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'This table is currently flagged as occupied, but there are no active kitchen or POS orders.',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: AppColors.textPrimary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final success = await context.read<TablesProvider>().releaseTable(table['id'] as int);
+                        if (mounted && success) {
+                          showTopSnackBar(context, SnackBar(
+                            content: Text('Table ${table['number']} is now Available!', style: GoogleFonts.poppins()),
+                            backgroundColor: AppColors.statusGreen,
+                          ));
+                        }
+                      },
+                      icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                      label: const Text('Free Table'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.statusGreen,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        context.read<OrdersProvider>().setPreselectedOrder('Dine-In', table['number']);
+                        HomeShell.selectTabByLabel('POS');
+                      },
+                      icon: const Icon(Icons.point_of_sale_rounded, size: 18),
+                      label: const Text('New Order'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.accentAmber,
+                        side: BorderSide(color: AppColors.accentAmber),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
                       ),
                     ),
                   ),
