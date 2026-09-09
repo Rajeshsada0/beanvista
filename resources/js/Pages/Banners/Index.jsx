@@ -36,6 +36,7 @@ export default function BannerIndex({ banners = [] }) {
         reset();
         setPreviewImage(null);
         clearErrors();
+        setIsGalleryOpen(false);
         setIsModalOpen(true);
     };
 
@@ -52,6 +53,7 @@ export default function BannerIndex({ banners = [] }) {
         });
         setPreviewImage(banner.image_url);
         clearErrors();
+        setIsGalleryOpen(false);
         setIsModalOpen(true);
     };
 
@@ -65,6 +67,7 @@ export default function BannerIndex({ banners = [] }) {
                 forceFormData: true,
                 onSuccess: () => {
                     setIsModalOpen(false);
+                    setIsGalleryOpen(false);
                     reset();
                 }
             });
@@ -73,6 +76,7 @@ export default function BannerIndex({ banners = [] }) {
                 forceFormData: true,
                 onSuccess: () => {
                     setIsModalOpen(false);
+                    setIsGalleryOpen(false);
                     reset();
                 }
             });
@@ -289,7 +293,20 @@ export default function BannerIndex({ banners = [] }) {
                                 <label className="block text-xs font-bold text-slate-700 mb-1">Offer Image (Optional)</label>
                                 <div className="flex items-center space-x-3">
                                     {previewImage ? (
-                                        <img src={previewImage} className="w-14 h-14 object-cover rounded-xl border border-slate-200 shrink-0" alt="Preview" />
+                                        <div className="relative group shrink-0">
+                                            <img src={previewImage} className="w-14 h-14 object-cover rounded-xl border border-slate-200" alt="Preview" />
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setData('image', '__REMOVE__');
+                                                    setPreviewImage(null);
+                                                }}
+                                                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center shadow hover:bg-rose-600 transition-colors"
+                                                title="Remove image"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </div>
                                     ) : (
                                         <div className="w-14 h-14 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
                                             <ImageIcon className="w-6 h-6" />
@@ -365,20 +382,26 @@ export default function BannerIndex({ banners = [] }) {
                             </div>
                         </form>
                     </div>
-
-                    {/* Media Gallery Picker Modal */}
-                    {isGalleryOpen && (
-                        <MediaGallery 
-                            onSelect={(url) => {
-                                setData('image', url);
-                                setPreviewImage(url);
-                                setIsGalleryOpen(false);
-                            }}
-                            onClose={() => setIsGalleryOpen(false)}
-                        />
-                    )}
                 </div>
             )}
+
+            {/* Media Gallery Picker Modal */}
+            <MediaGallery 
+                isOpen={isGalleryOpen}
+                type="images"
+                title="Select Banner Image"
+                onSelect={(selection) => {
+                    if (typeof selection === 'string') {
+                        setData('image', selection);
+                        setPreviewImage(`/img/${selection}`);
+                    } else {
+                        setData('image', selection);
+                        setPreviewImage(URL.createObjectURL(selection));
+                    }
+                    setIsGalleryOpen(false);
+                }}
+                onClose={() => setIsGalleryOpen(false)}
+            />
         </AuthenticatedLayout>
     );
 }

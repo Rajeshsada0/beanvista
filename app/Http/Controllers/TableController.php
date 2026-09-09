@@ -11,22 +11,39 @@ class TableController extends Controller
     {
         $tables = \App\Models\Table::with([
             'orders' => function($q) {
-                $q->whereNotIn('status', ['completed', 'cancelled'])->with(['customer', 'items']);
+                $q->withoutGlobalScope(\App\Models\Scopes\BranchScope::class)
+                  ->whereNotIn('status', ['completed', 'cancelled'])
+                  ->with(['customer', 'items']);
             },
             'reservations' => function($q) {
-                $q->where('status', 'active');
+                $q->withoutGlobalScope(\App\Models\Scopes\BranchScope::class)
+                  ->where('status', 'active');
             }
         ])->get();
 
-        // Auto-heal status for any desynchronized table
+        $currentBranchId = session('active_branch_id') ?: auth()->user()->primary_branch_id;
+
+        // Auto-heal status and missing branch_id for any desynchronized table or order
         foreach ($tables as $table) {
             $activeOrder = $table->orders->first();
-            if ($table->status === 'occupied' && !$activeOrder) {
-                $table->update(['status' => 'available']);
-                $table->status = 'available';
-            } elseif ($table->status === 'available' && $activeOrder) {
-                $table->update(['status' => 'occupied']);
-                $table->status = 'occupied';
+            if ($activeOrder) {
+                // If active order lacks branch_id, heal it immediately with table's branch or current user branch
+                if (!$activeOrder->branch_id) {
+                    $targetBranchId = $table->branch_id ?: $currentBranchId;
+                    if ($targetBranchId) {
+                        $activeOrder->update(['branch_id' => $targetBranchId]);
+                        $activeOrder->branch_id = $targetBranchId;
+                    }
+                }
+                if ($table->status !== 'occupied') {
+                    $table->update(['status' => 'occupied']);
+                    $table->status = 'occupied';
+                }
+            } else {
+                if ($table->status === 'occupied') {
+                    $table->update(['status' => 'available']);
+                    $table->status = 'available';
+                }
             }
         }
 

@@ -26,13 +26,21 @@ class MediaController extends Controller
             return response()->json(['message' => 'Unauthorized'], 401);
         }
         $tenantId = $user->tenant_id;
-        $directory = "tenants/{$tenantId}/menus/{$type}";
-        
-        if (!Storage::disk('public')->exists($directory)) {
-            return response()->json([]);
+        $directories = ["tenants/{$tenantId}/menus/{$type}"];
+        if ($type === 'images') {
+            $directories[] = "tenants/{$tenantId}/banners";
         }
 
-        $files = Storage::disk('public')->files($directory);
+        $files = [];
+        foreach ($directories as $directory) {
+            if (Storage::disk('public')->exists($directory)) {
+                $files = array_merge($files, Storage::disk('public')->files($directory));
+            }
+        }
+
+        if (empty($files)) {
+            return response()->json([]);
+        }
         
         $media = collect($files)->map(function ($file) {
             return [
@@ -138,10 +146,11 @@ class MediaController extends Controller
 
         Storage::disk('public')->move($path, $newPath);
 
-        // Update database references in menus and loyalty rewards
+        // Update database references in menus, loyalty rewards and banners
         Menu::where('image_path', $path)->update(['image_path' => $newPath]);
         Menu::where('icon_path', $path)->update(['icon_path' => $newPath]);
         LoyaltyReward::where('image_path', $path)->update(['image_path' => $newPath]);
+        \App\Models\Banner::where('image_path', $path)->update(['image_path' => $newPath]);
 
         return response()->json([
             'success' => true,
@@ -186,10 +195,11 @@ class MediaController extends Controller
 
         Storage::disk('public')->delete($path);
 
-        // Clear database references in menus and loyalty rewards
+        // Clear database references in menus, loyalty rewards and banners
         Menu::where('image_path', $path)->update(['image_path' => null]);
         Menu::where('icon_path', $path)->update(['icon_path' => null]);
         LoyaltyReward::where('image_path', $path)->update(['image_path' => null]);
+        \App\Models\Banner::where('image_path', $path)->update(['image_path' => null]);
 
         return response()->json([
             'success' => true,

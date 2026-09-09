@@ -25,7 +25,8 @@ class POSController extends Controller
                 $q->where('status', true)->orWhere('status', 1)->orWhereNull('status');
             })->get(),
             'tables' => Table::with(['activeOrders' => function($q) {
-                $q->where(function($query) {
+                $q->withoutGlobalScope(\App\Models\Scopes\BranchScope::class)
+                  ->where(function($query) {
                     $query->whereNotIn('status', ['completed', 'cancelled'])
                           ->orWhere(function($sub) {
                               $sub->where('status', 'completed')

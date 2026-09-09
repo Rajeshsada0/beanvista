@@ -73,6 +73,12 @@ class KdsItem {
     final s = (secs % 60).toString().padLeft(2, '0');
     return '$m:$s';
   }
+
+  String get formattedOrderNumber {
+    final clean = orderNumber.replaceFirst(RegExp(r'^#+'), '').trim();
+    if (clean.isEmpty) return '#$orderId';
+    return '#$clean';
+  }
 }
 
 class GroupedOrder {
@@ -122,6 +128,12 @@ class GroupedOrder {
     final m = (secs ~/ 60).toString().padLeft(2, '0');
     final s = (secs % 60).toString().padLeft(2, '0');
     return '$m:$s';
+  }
+
+  String get formattedOrderNumber {
+    final clean = orderNumber.replaceFirst(RegExp(r'^#+'), '').trim();
+    if (clean.isEmpty) return '#$orderId';
+    return '#$clean';
   }
 }
 
@@ -190,16 +202,42 @@ class _KdsScreenState extends State<KdsScreen> {
     _isFetching = true;
     try {
       final api = context.read<ApiService>();
+      final ordersProvider = context.read<OrdersProvider>();
       final res = await api.get('/orders?status=active');
       if (res != null && res['data'] != null) {
         final List<KdsItem> loaded = [];
         final ordersList = res['data'] as List;
+
+        // Try getting cached orders from OrdersProvider to match numbers if available
+        final providerOrders = ordersProvider.orders;
+
         for (final order in ordersList) {
           final orderId = JsonUtils.parseInt(order['id']);
-          final orderNumber =
-              order['display_number'] as String? ??
-              order['order_number'] as String? ??
-              '#$orderId';
+
+          String rawOrderNumber = '';
+          for (final o in providerOrders) {
+            if (o.id == orderId && o.number.trim().isNotEmpty) {
+              rawOrderNumber = o.number.trim();
+              break;
+            }
+          }
+
+          if (rawOrderNumber.isEmpty) {
+            final cand = (order['display_number'] ??
+                          order['order_number'] ??
+                          order['number'] ??
+                          order['code'])?.toString().trim();
+            if (cand != null && cand.isNotEmpty) {
+              rawOrderNumber = cand;
+            }
+          }
+
+          if (rawOrderNumber.isEmpty) {
+            rawOrderNumber = '#$orderId';
+          }
+
+          final cleanNum = rawOrderNumber.replaceFirst(RegExp(r'^#+'), '').trim();
+          final orderNumber = cleanNum.isNotEmpty ? '#$cleanNum' : '#$orderId';
           final tableStr = (order['table'] is Map)
               ? 'T${(order['table'] as Map)['table_number'] ?? '1'}'
               : (order['table'] as String? ??
@@ -306,10 +344,15 @@ class _KdsScreenState extends State<KdsScreen> {
 
     // 3. Search Query
     if (_searchQuery.trim().isNotEmpty) {
-      final q = _searchQuery.toLowerCase();
+      final q = _searchQuery.toLowerCase().trim();
+      final qClean = q.replaceFirst(RegExp(r'^#+'), '');
       list = list.where((e) {
         return e.table.toLowerCase().contains(q) ||
             e.orderNumber.toLowerCase().contains(q) ||
+            e.formattedOrderNumber.toLowerCase().contains(q) ||
+            (qClean.isNotEmpty &&
+                (e.orderNumber.toLowerCase().contains(qClean) ||
+                    e.orderId.toString().contains(qClean))) ||
             e.item.toLowerCase().contains(q) ||
             (e.waiterName?.toLowerCase().contains(q) ?? false) ||
             (e.customerName?.toLowerCase().contains(q) ?? false);
@@ -1372,7 +1415,7 @@ class _GroupedOrderCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '#${orderGroup.orderNumber}',
+                                orderGroup.formattedOrderNumber,
                                 style: GoogleFonts.poppins(
                                   color: AppColors.isDark
                                       ? Colors.white
@@ -2014,7 +2057,7 @@ class _KdsCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '#${item.orderNumber}',
+                                item.formattedOrderNumber,
                                 style: GoogleFonts.poppins(
                                   color: AppColors.isDark
                                       ? Colors.white

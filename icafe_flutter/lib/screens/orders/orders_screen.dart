@@ -647,8 +647,13 @@ class _OrdersScreenState extends State<OrdersScreen>
     final isLight = !AppColors.isDark;
     final screenWidth = MediaQuery.of(context).size.width;
     final crossAxisCount = _isGridView
-        ? (screenWidth > 900 ? 4 : (screenWidth > 600 ? 3 : (screenWidth > 450 ? 2 : 1)))
+        ? (screenWidth >= 1000
+            ? 4
+            : (screenWidth >= 600
+                ? 3
+                : (screenWidth < 280 ? 1 : 2)))
         : 1;
+    final double mainAxisExtent = screenWidth < 360 ? 365 : 350;
 
     return RefreshIndicator(
       onRefresh: _onRefresh,
@@ -663,7 +668,7 @@ class _OrdersScreenState extends State<OrdersScreen>
                 crossAxisCount: crossAxisCount,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
-                mainAxisExtent: 350,
+                mainAxisExtent: mainAxisExtent,
               ),
               itemCount: orders.length,
               itemBuilder: (context, index) =>
@@ -879,20 +884,23 @@ class _OrdersScreenState extends State<OrdersScreen>
                 ),
                 if (order['customer'] != null && (order['customer'] as String).isNotEmpty) ...[
                   const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                    decoration: BoxDecoration(
-                      color: isLight ? const Color(0xFFEFF6FF) : AppColors.darkSurface,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      (order['customer'] as String).toUpperCase(),
-                      style: GoogleFonts.poppins(
-                        fontSize: 8,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF2563EB),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: isLight ? const Color(0xFFEFF6FF) : AppColors.darkSurface,
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      overflow: TextOverflow.ellipsis,
+                      child: Text(
+                        (order['customer'] as String).toUpperCase(),
+                        style: GoogleFonts.poppins(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF2563EB),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
                 ],
@@ -982,65 +990,74 @@ class _OrdersScreenState extends State<OrdersScreen>
           ] else ...[
             Padding(
               padding: EdgeInsets.symmetric(horizontal: isGrid ? 12 : 16),
-              child: Column(
-                children: displayItems.map((item) {
-                  String name = '';
-                  int qty = 1;
-                  double price = 0.0;
-                  if (item is OrderItemDetails) {
-                    name = item.name;
-                    qty = item.qty;
-                    price = item.price;
-                  } else if (item is Map) {
-                    name = (item['name'] ?? '') as String;
-                    qty = (item['qty'] ?? 1) as int;
-                    price = JsonUtils.parseDouble(item['price']);
-                  }
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: isGrid ? 95 : double.infinity,
+                ),
+                child: SingleChildScrollView(
+                  physics: isGrid ? const BouncingScrollPhysics() : const NeverScrollableScrollPhysics(),
+                  child: Column(
+                    children: displayItems.map((item) {
+                      String name = '';
+                      int qty = 1;
+                      double price = 0.0;
+                      if (item is OrderItemDetails) {
+                        name = item.name;
+                        qty = item.qty;
+                        price = item.price;
+                      } else if (item is Map) {
+                        name = (item['name'] ?? '') as String;
+                        qty = (item['qty'] ?? 1) as int;
+                        price = JsonUtils.parseDouble(item['price']);
+                      }
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEFF6FF),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '${qty}x',
-                            style: GoogleFonts.poppins(
-                              fontSize: isGrid ? 10 : 11,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF2563EB),
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '${qty}x',
+                                style: GoogleFonts.poppins(
+                                  fontSize: isGrid ? 10 : 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF2563EB),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            name,
-                            style: GoogleFonts.poppins(
-                              fontSize: isGrid ? 11 : 12,
-                              fontWeight: FontWeight.w500,
-                              color: isLight ? const Color(0xFF334155) : AppColors.textPrimary,
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                name,
+                                style: GoogleFonts.poppins(
+                                  fontSize: isGrid ? 11 : 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: isLight ? const Color(0xFF334155) : AppColors.textPrimary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Rs. ${price.toStringAsFixed(2)}',
+                              style: GoogleFonts.poppins(
+                                fontSize: isGrid ? 10.5 : 12,
+                                fontWeight: FontWeight.w500,
+                                color: isLight ? const Color(0xFF64748B) : AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          'Rs. ${price.toStringAsFixed(2)}',
-                          style: GoogleFonts.poppins(
-                            fontSize: isGrid ? 11 : 12,
-                            fontWeight: FontWeight.w500,
-                            color: isLight ? const Color(0xFF64748B) : AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
+                      );
+                    }).toList(),
+                  ),
+                ),
               ),
             ),
           ],
@@ -1116,12 +1133,16 @@ class _OrdersScreenState extends State<OrdersScreen>
                     letterSpacing: 0.5,
                   ),
                 ),
-                Text(
-                  'Rs. ${JsonUtils.parseDouble(order['total']).toStringAsFixed(2)}',
-                  style: GoogleFonts.poppins(
-                    fontSize: isGrid ? 14 : 18,
-                    fontWeight: FontWeight.w800,
-                    color: isLight ? const Color(0xFF0F172A) : AppColors.textPrimary,
+                Flexible(
+                  child: Text(
+                    'Rs. ${JsonUtils.parseDouble(order['total']).toStringAsFixed(2)}',
+                    style: GoogleFonts.poppins(
+                      fontSize: isGrid ? 14 : 18,
+                      fontWeight: FontWeight.w800,
+                      color: isLight ? const Color(0xFF0F172A) : AppColors.textPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
                   ),
                 ),
               ],

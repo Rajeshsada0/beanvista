@@ -2,6 +2,7 @@ import { Link, usePage, router } from '@inertiajs/react';
 import { useState, useEffect, useMemo } from 'react';
 import { LayoutDashboard, Table, CalendarDays, ShoppingBag, Coffee, ChevronRight, ChevronDown, Menu as MenuIcon, X, Settings, User, BarChart3, ChefHat, LogIn, LogOut, Clock, Users, Gift, FolderOpen, ListPlus, Percent, ConciergeBell, Boxes, Building2, Activity, ChevronLeft, CreditCard, Monitor, Globe, Sparkles } from 'lucide-react';
 import Dropdown from '@/Components/Dropdown';
+import GlobalNotification from '@/Components/GlobalNotification';
 
 const themeColors = {
     daily_ops: {
@@ -315,6 +316,9 @@ export default function AuthenticatedLayout({ children }) {
 
     return (
         <div data-theme={settings?.theme || 'blue'} className="flex min-h-screen bg-gray-50 font-sans text-gray-900 selection:bg-brand-300 selection:text-brand-900">
+            {/* Global Notifications System */}
+            <GlobalNotification />
+
             {/* Impersonation Banner */}
             {usePage().props.is_impersonating && (
                 <div className="fixed top-0 inset-x-0 z-[100] bg-orange-600 text-white px-4 py-2 flex items-center justify-between shadow-md">

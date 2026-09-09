@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/json_utils.dart';
@@ -80,6 +81,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   List<Map<String, dynamic>> _weeklySales = [];
   List<Map<String, dynamic>> _topSelling = [];
   List<Map<String, dynamic>> _lowStock = [];
+  List<Map<String, dynamic>> _todayCounterExpenses = [];
+  Map<String, dynamic>? _activeSession;
   List<Map<String, dynamic>> _recentActivity = [];
   String? _lastActiveTab;
 
@@ -216,6 +219,18 @@ class _DashboardScreenState extends State<DashboardScreen>
                 .toList();
             _addLowStockNotifications();
           }
+
+          if (response['todayCounterExpenses'] != null) {
+            _todayCounterExpenses = (response['todayCounterExpenses'] as List)
+                .map((e) => Map<String, dynamic>.from(e as Map))
+                .toList();
+          }
+
+          if (response['activeSession'] != null && response['activeSession'] is Map) {
+            _activeSession = Map<String, dynamic>.from(response['activeSession'] as Map);
+          } else {
+            _activeSession = null;
+          }
         });
       }
     } catch (e) {
@@ -348,6 +363,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: _buildLowStockAlerts(),
+                        ),
+                        const SizedBox(height: 24),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: _buildDailyCashExpenses(),
                         ),
                         const SizedBox(height: 24),
                         Padding(
@@ -2689,11 +2709,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     );
   }
-          Widget _buildLowStockAlerts() {
+  Widget _buildLowStockAlerts() {
     final displayList = _lowStock.take(3).toList();
 
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.darkCard,
         borderRadius: BorderRadius.circular(12),
@@ -2709,57 +2728,60 @@ class _DashboardScreenState extends State<DashboardScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Low Stock Alerts',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Low Stock Alerts',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'INVENTORY ITEMS BELOW WARNING THRESHOLD',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textMuted,
+                          letterSpacing: 0.5,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                if (_lowStock.isNotEmpty) ...[
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.statusRed.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'INVENTORY ITEMS BELOW WARNING THRESHOLD',
+                    child: Text(
+                      '${_lowStock.length} WARNINGS',
                       style: GoogleFonts.plusJakartaSans(
+                        color: AppColors.statusRed,
                         fontSize: 9,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textMuted,
-                        letterSpacing: 0.5,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              if (_lowStock.isNotEmpty) ...[
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.statusRed.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '${_lowStock.length} WARNINGS',
-                    style: GoogleFonts.plusJakartaSans(
-                      color: AppColors.statusRed,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
-          const SizedBox(height: 12),
+          const Divider(height: 1),
           if (_isLoading && _lowStock.isEmpty)
             Container(
               height: 100,
@@ -2782,67 +2804,873 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
             )
           else
-            ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: displayList.length,
-            separatorBuilder: (_, __) => Divider(color: AppColors.darkBorder, height: 24),
-            itemBuilder: (context, index) {
-              final item = displayList[index];
-              final stock = JsonUtils.parseDouble(item['stock']);
-              final threshold = JsonUtils.parseDouble(item['threshold']);
-              final unit = item['unit'] ?? 'pcs';
-              final isCritical = (threshold > 0 ? stock / threshold : 0.0) < 0.3;
-              
-              return Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item['name'] as String? ?? 'Unknown Item',
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: displayList.length,
+                separatorBuilder: (_, __) => Divider(color: AppColors.darkBorder, height: 24),
+                itemBuilder: (context, index) {
+                  final item = displayList[index];
+                  final stock = JsonUtils.parseDouble(item['stock']);
+                  final threshold = JsonUtils.parseDouble(item['threshold']);
+                  final unit = item['unit'] ?? 'pcs';
+                  final isCritical = (threshold > 0 ? stock / threshold : 0.0) < 0.3;
+                  
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item['name'] as String? ?? 'Unknown Item',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'THRESHOLD: ${threshold.toStringAsFixed(1).replaceAll('.0', '')} ${unit.toUpperCase()}',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textMuted,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isCritical 
+                              ? AppColors.statusRed.withOpacity(0.08) 
+                              : AppColors.statusAmber.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${stock.toStringAsFixed(1).replaceAll('.0', '')} $unit',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12.5,
+                            color: isCritical ? AppColors.statusRed : AppColors.statusAmber,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Daily Cash Expenses (Counter Uses) ────────────────────────────────────────
+
+  Widget _buildDailyCashExpenses() {
+    final financeProvider = context.watch<FinanceProvider>();
+    final List<dynamic> providerTxns = financeProvider.todayCounterExpenses;
+    final List<Map<String, dynamic>> expensesList = providerTxns.isNotEmpty
+        ? providerTxns.map((e) => Map<String, dynamic>.from(e as Map)).toList()
+        : _todayCounterExpenses;
+
+    final double totalExpenses = _todayCashExpenses > 0
+        ? _todayCashExpenses
+        : (financeProvider.counterExpenses > 0 ? financeProvider.counterExpenses : 0.0);
+
+    final displayList = expensesList.take(5).toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.darkCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.darkBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.015),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Daily Cash Expenses',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'COUNTER DRAWER USES (LEMON, LIGHTER, ETC.)',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textMuted,
+                          letterSpacing: 0.5,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.statusRed.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.statusRed.withOpacity(0.25)),
+                      ),
+                      child: Text(
+                        '${AppConstants.currencySymbol} ${NumberFormat('#,##0.00').format(totalExpenses)}',
+                        style: GoogleFonts.plusJakartaSans(
+                          color: AppColors.statusRed,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: () => _showAddCashExpenseSheet(context),
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: AppColors.statusRed.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.statusRed.withOpacity(0.2)),
+                        ),
+                        child: Icon(
+                          Icons.add_rounded,
+                          size: 16,
+                          color: AppColors.statusRed,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+
+          // Body
+          if (_isLoading && expensesList.isEmpty)
+            Container(
+              height: 110,
+              alignment: Alignment.center,
+              child: CircularProgressIndicator(color: AppColors.accentAmber),
+            )
+          else if (expensesList.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppColors.statusRed.withOpacity(0.08),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.statusRed.withOpacity(0.2)),
+                      ),
+                      child: Icon(
+                        Icons.receipt_long_rounded,
+                        color: AppColors.statusRed,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'No Counter Expenses',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'No cash taken from drawer today for petty supplies.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10.5,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    OutlinedButton.icon(
+                      onPressed: () => _showAddCashExpenseSheet(context),
+                      icon: const Icon(Icons.add_rounded, size: 14),
+                      label: Text(
+                        'Record Cash Out',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.statusRed,
+                        side: BorderSide(color: AppColors.statusRed.withOpacity(0.35)),
+                        backgroundColor: AppColors.statusRed.withOpacity(0.06),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.all(14.0),
+              child: Column(
+                children: displayList.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final item = entry.value;
+                  final bool isOut = item['type'] != 'cash_in';
+                  final double amt = JsonUtils.parseDouble(item['amount']);
+                  final String notes = item['notes']?.toString() ?? '';
+                  final user = item['user'] is Map ? item['user']['name'] ?? 'Staff' : 'Staff';
+                  final isLast = index == displayList.length - 1;
+
+                  String timeStr = '';
+                  if (item['created_at'] != null) {
+                    try {
+                      final dt = DateTime.parse(item['created_at'].toString()).toLocal();
+                      timeStr = DateFormat('hh:mm a').format(dt);
+                    } catch (_) {
+                      timeStr = item['created_at'].toString();
+                    }
+                  }
+
+                  return Container(
+                    margin: EdgeInsets.only(bottom: isLast ? 0 : 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.darkSurface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.darkBorder.withOpacity(0.6)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: (isOut ? AppColors.statusRed : AppColors.statusGreen).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: (isOut ? AppColors.statusRed : AppColors.statusGreen).withOpacity(0.2),
+                            ),
+                          ),
+                          child: Icon(
+                            isOut ? Icons.remove_circle_outline_rounded : Icons.add_circle_outline_rounded,
+                            size: 15,
+                            color: isOut ? AppColors.statusRed : AppColors.statusGreen,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                notes.isNotEmpty ? notes : (isOut ? 'Cash Out' : 'Cash In'),
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '$user • $timeStr',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 9.5,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         Text(
-                          'THRESHOLD: ${threshold.toStringAsFixed(1).replaceAll('.0', '')} ${unit.toUpperCase()}',
+                          '${isOut ? '-' : '+'} ${AppConstants.currencySymbol} ${NumberFormat('#,##0.00').format(amt)}',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 9,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: isOut ? AppColors.statusRed : AppColors.statusGreen,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+
+          // Footer
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const FinanceScreen(initialTabIndex: 2),
+                      ),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Cash Counter',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textMuted,
-                            letterSpacing: 0.4,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                InkWell(
+                  onTap: () => _showAddCashExpenseSheet(context),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add_rounded, size: 14, color: AppColors.statusRed),
+                        const SizedBox(width: 2),
+                        Text(
+                          '+ Cash Out',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.statusRed,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isCritical 
-                          ? AppColors.statusRed.withOpacity(0.08) 
-                          : AppColors.statusAmber.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '${stock.toStringAsFixed(1).replaceAll('.0', '')} $unit',
-                      style: GoogleFonts.plusJakartaSans(
-                        color: isCritical ? AppColors.statusRed : AppColors.statusAmber,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
+                ),
+              ],
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showAddCashExpenseSheet(BuildContext context) {
+    final financeProvider = context.read<FinanceProvider>();
+    final activeSession = _activeSession ?? financeProvider.cashRegister['activeSession'];
+
+    if (activeSession == null) {
+      showDialog(
+        context: context,
+        builder: (c) => AlertDialog(
+          backgroundColor: AppColors.isDark ? AppColors.darkCard : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Cash Register Closed',
+            style: GoogleFonts.poppins(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+              fontSize: 17,
+            ),
+          ),
+          content: Text(
+            'The cash counter drawer is currently closed. Please open a session from the Cash Counter to record drawer expenses.',
+            style: GoogleFonts.poppins(
+              color: AppColors.textSecondary,
+              fontSize: 13.5,
+              height: 1.4,
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              ),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.poppins(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(c);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const FinanceScreen(initialTabIndex: 2)),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accentAmber,
+                foregroundColor: AppColors.textOnAmber,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+              child: Text(
+                'Go to Cash Counter',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: AppColors.textOnAmber,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final amountCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
+    String currentType = 'cash_out';
+    int? selectedCategory;
+    final categories = financeProvider.counterExpenseCategories;
+
+    final quickAmounts = [20, 50, 100, 200, 500];
+    final suggestionChips = [
+      'Lemon & sugar',
+      'Lighter / matches',
+      'Milk emergency',
+      'Drinking water bottle',
+      'Kitchen cleaning items',
+      'Ice bag',
+      'Packaging bags',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.darkCard,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setStateSheet) => Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(ctx2).viewInsets.bottom + 24,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: (currentType == 'cash_out' ? AppColors.statusRed : AppColors.statusGreen).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            currentType == 'cash_out' ? Icons.remove_circle_outline_rounded : Icons.add_circle_outline_rounded,
+                            size: 18,
+                            color: currentType == 'cash_out' ? AppColors.statusRed : AppColors.statusGreen,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              currentType == 'cash_out' ? 'Daily Counter Expense' : 'Add Cash Float',
+                              style: GoogleFonts.plusJakartaSans(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            Text(
+                              currentType == 'cash_out' ? 'Supplies (lemon, sugar, lighter, etc.)' : 'Add float to register drawer',
+                              style: GoogleFonts.plusJakartaSans(
+                                color: AppColors.textMuted,
+                                fontSize: 10.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.grey, size: 20),
+                      onPressed: () => Navigator.pop(ctx2),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Type selector toggle
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppColors.darkSurface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.darkBorder),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setStateSheet(() => currentType = 'cash_out'),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 9),
+                            decoration: BoxDecoration(
+                              color: currentType == 'cash_out' ? AppColors.statusRed : Colors.transparent,
+                              borderRadius: BorderRadius.circular(9),
+                            ),
+                            alignment: Alignment.center,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.remove_circle_outline_rounded,
+                                  size: 14,
+                                  color: currentType == 'cash_out' ? Colors.white : AppColors.textMuted,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Cash Out (Expense)',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    color: currentType == 'cash_out' ? Colors.white : AppColors.textMuted,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setStateSheet(() => currentType = 'cash_in'),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 9),
+                            decoration: BoxDecoration(
+                              color: currentType == 'cash_in' ? AppColors.statusGreen : Colors.transparent,
+                              borderRadius: BorderRadius.circular(9),
+                            ),
+                            alignment: Alignment.center,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.add_circle_outline_rounded,
+                                  size: 14,
+                                  color: currentType == 'cash_in' ? Colors.white : AppColors.textMuted,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Cash In (Float)',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    color: currentType == 'cash_in' ? Colors.white : AppColors.textMuted,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Amount
+                Text(
+                  'AMOUNT (${AppConstants.currencySymbol})',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textMuted,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: amountCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: GoogleFonts.plusJakartaSans(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    prefixText: '${AppConstants.currencySymbol} ',
+                    prefixStyle: GoogleFonts.plusJakartaSans(color: AppColors.textSecondary, fontSize: 16, fontWeight: FontWeight.bold),
+                    hintText: '0.00',
+                    hintStyle: GoogleFonts.plusJakartaSans(color: AppColors.textMuted),
+                    filled: true,
+                    fillColor: AppColors.darkSurface,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.darkBorder)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.darkBorder)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.accentAmber)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Quick Amount chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: quickAmounts.map((q) => Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: GestureDetector(
+                        onTap: () {
+                          amountCtrl.text = q.toString();
+                          setStateSheet(() {});
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.darkSurface,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppColors.darkBorder),
+                          ),
+                          child: Text(
+                            '+$q',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )).toList(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Reason / Notes
+                Text(
+                  'REASON / NOTE',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textMuted,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: notesCtrl,
+                  style: GoogleFonts.plusJakartaSans(color: AppColors.textPrimary, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: currentType == 'cash_out' ? 'e.g. Lemon, sugar, lighter, cleaning cloth' : 'e.g. Added change from bank',
+                    hintStyle: GoogleFonts.plusJakartaSans(color: AppColors.textMuted, fontSize: 12),
+                    filled: true,
+                    fillColor: AppColors.darkSurface,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.darkBorder)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.darkBorder)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.accentAmber)),
+                  ),
+                ),
+
+                // Quick suggestion chips
+                if (currentType == 'cash_out') ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: suggestionChips.map((chip) => GestureDetector(
+                      onTap: () {
+                        if (notesCtrl.text.trim().isEmpty) {
+                          notesCtrl.text = chip;
+                        } else {
+                          notesCtrl.text = "${notesCtrl.text.trim()}, $chip";
+                        }
+                        setStateSheet(() {});
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.statusAmber.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.statusAmber.withOpacity(0.3)),
+                        ),
+                        child: Text(
+                          "+ $chip",
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.accentAmber,
+                          ),
+                        ),
+                      ),
+                    )).toList(),
+                  ),
+                ],
+
+                // Category (Optional)
+                if (currentType == 'cash_out' && categories.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    'EXPENSE CATEGORY (OPTIONAL)',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textMuted,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<int>(
+                    value: selectedCategory,
+                    dropdownColor: AppColors.darkCard,
+                    style: GoogleFonts.plusJakartaSans(color: AppColors.textPrimary, fontSize: 13),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: AppColors.darkSurface,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.darkBorder)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.darkBorder)),
+                    ),
+                    hint: Text('General Daily Counter Expense', style: GoogleFonts.plusJakartaSans(color: AppColors.textMuted, fontSize: 12)),
+                    items: categories.map<DropdownMenuItem<int>>((cat) {
+                      return DropdownMenuItem<int>(
+                        value: JsonUtils.parseInt(cat['id']),
+                        child: Text(cat['name']?.toString() ?? ''),
+                      );
+                    }).toList(),
+                    onChanged: (v) => setStateSheet(() => selectedCategory = v),
+                  ),
+                ],
+
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final val = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
+                      final note = notesCtrl.text.trim();
+                      if (val <= 0 || note.isEmpty) {
+                        showTopSnackBar(
+                          context,
+                          SnackBar(
+                            content: const Text('Please enter a valid amount and reason'),
+                            backgroundColor: AppColors.statusRed,
+                          ),
+                        );
+                        return;
+                      }
+
+                      final success = await financeProvider.addCashCounterTransaction(
+                        amount: val,
+                        notes: note,
+                        type: currentType,
+                        expenseCategoryId: selectedCategory,
+                      );
+
+                      if (success && ctx2.mounted) {
+                        Navigator.pop(ctx2);
+                        showTopSnackBar(
+                          context,
+                          SnackBar(
+                            content: Text(
+                              currentType == 'cash_out'
+                                  ? 'Cash expense recorded successfully'
+                                  : 'Float added to counter successfully',
+                            ),
+                            backgroundColor: AppColors.statusGreen,
+                          ),
+                        );
+                        _fetchDashboardData();
+                      } else if (ctx2.mounted) {
+                        showTopSnackBar(
+                          context,
+                          SnackBar(
+                            content: Text(financeProvider.error ?? 'Transaction failed'),
+                            backgroundColor: AppColors.statusRed,
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: currentType == 'cash_out' ? AppColors.statusRed : AppColors.statusGreen,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      currentType == 'cash_out' ? 'Record Cash Out' : 'Record Cash In',
+                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -27,8 +27,8 @@ class BranchScope implements Scope
             // Only scope if the session has an active branch ID or we have auth fallback
             if ($branchId) {
                 $table = $model->getTable();
-                // Catalog and configuration data should include global tenant records (where branch_id IS NULL)
-                if (in_array($table, ['menus', 'categories', 'addons', 'taxes', 'tables', 'bank_accounts', 'banners', 'loyalty_rewards'])) {
+                // Catalog, configuration, tables, orders, and reservations should include global tenant records (where branch_id IS NULL)
+                if (in_array($table, ['menus', 'categories', 'addons', 'taxes', 'tables', 'bank_accounts', 'banners', 'loyalty_rewards', 'orders', 'reservations'])) {
                     $builder->where(function ($q) use ($table, $branchId) {
                         $q->where($table . '.branch_id', $branchId)
                           ->orWhereNull($table . '.branch_id');

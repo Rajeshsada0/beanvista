@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_notification.dart';
 import '../../core/utils/json_utils.dart';
 import '../../providers/menu_provider.dart';
 import '../../providers/tables_provider.dart';
@@ -232,16 +233,11 @@ class _PosScreenState extends State<PosScreen>
   }
 
   void _showAddedSnack(String name) {
-    ScaffoldMessenger.of(context).clearSnackBars();
-    showTopSnackBar(context, SnackBar(
-      content: Row(children: [
-        Icon(Icons.check_circle, color: AppColors.statusGreen, size: 18),
-        const SizedBox(width: 8),
-        Text('$name added to cart',
-            style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 13)),
-      ]),
-      duration: const Duration(seconds: 1),
-    ));
+    AppNotification.success(
+      context,
+      title: '$name added to cart',
+      duration: const Duration(milliseconds: 1800),
+    );
   }
 
   Future<void> _saveOrderPending() async {
@@ -289,33 +285,30 @@ class _PosScreenState extends State<PosScreen>
         _modifyingOrderId = null;
       });
       context.read<OrdersProvider>().clearModification();
-      showTopSnackBar(context, SnackBar(
-        content: Row(children: [
-          Icon(Icons.save_rounded, color: AppColors.accentAmber, size: 18),
-          const SizedBox(width: 8),
-          Text(wasModifying ? 'Order Updated Successfully!' : 'Order Saved (Pending)!',
-              style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 13)),
-        ]),
+      AppNotification.success(
+        context,
+        title: wasModifying ? 'Order Updated Successfully!' : 'Order Saved (Pending)!',
         duration: const Duration(seconds: 3),
-      ));
+      );
       tablesProvider.fetchTables();
       context.read<OrdersProvider>().fetchOrders();
     } else {
       final errorMsg = context.read<OrdersProvider>().error ?? 'Failed to save order.';
-      showTopSnackBar(context, SnackBar(
-        content: Text(errorMsg,
-            style: GoogleFonts.poppins(color: AppColors.textPrimary)),
-        backgroundColor: AppColors.statusRedBg,
-      ));
+      AppNotification.error(
+        context,
+        title: 'Failed to save order',
+        message: errorMsg,
+      );
     }
   }
 
   void _showPaymentModal() async {
     if (_cart.isEmpty) {
-      showTopSnackBar(context, SnackBar(
-        content: Text('Cart is empty!',
-            style: GoogleFonts.poppins(color: AppColors.textPrimary)),
-      ));
+      AppNotification.warning(
+        context,
+        title: 'Cart is empty',
+        message: 'Please add items to cart before proceeding.',
+      );
       return;
     }
     if (_orderType == 'Dine-In' && (_selectedTable == null || _selectedTable!.isEmpty)) {
@@ -381,32 +374,23 @@ class _PosScreenState extends State<PosScreen>
               _modifyingOrderId = null;
             });
             context.read<OrdersProvider>().clearModification();
-            showTopSnackBar(context, SnackBar(
-              content: Row(children: [
-                Icon(Icons.celebration, color: AppColors.accentAmber, size: 18),
-                const SizedBox(width: 8),
-                Text('Order placed via $method!',
-                    style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 13)),
-              ]),
+            AppNotification.success(
+              context,
+              title: 'Order placed via $method!',
               duration: const Duration(seconds: 3),
-            ));
+            );
             
             // Refresh tables and orders
             tablesProvider.fetchTables();
             context.read<OrdersProvider>().fetchOrders();
           } else {
             final errorMsg = context.read<OrdersProvider>().error ?? 'Failed to place order. Please try again.';
-            showTopSnackBar(context, SnackBar(
-              content: Row(children: [
-                Icon(Icons.error_outline, color: AppColors.statusRed, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(errorMsg,
-                      style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 13)),
-                ),
-              ]),
+            AppNotification.error(
+              context,
+              title: 'Failed to place order',
+              message: errorMsg,
               duration: const Duration(seconds: 4),
-            ));
+            );
           }
         },
       ),

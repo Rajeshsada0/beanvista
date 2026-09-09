@@ -42,6 +42,19 @@ class Order extends Model
             if (empty($order->order_number)) {
                 $order->order_number = self::generateOrderNumber($order->tenant_id);
             }
+
+            // Auto-assign branch_id from table or tenant fallback if missing
+            if (empty($order->branch_id)) {
+                if ($order->table_id) {
+                    $table = \App\Models\Table::withoutGlobalScopes()->find($order->table_id);
+                    if ($table && $table->branch_id) {
+                        $order->branch_id = $table->branch_id;
+                    }
+                }
+                if (empty($order->branch_id) && $order->tenant_id) {
+                    $order->branch_id = \App\Models\Branch::where('tenant_id', $order->tenant_id)->value('id');
+                }
+            }
         });
         
         static::created(function ($order) use ($clearCache) {
@@ -86,6 +99,7 @@ class Order extends Model
 
     protected $fillable = [
         'tenant_id',
+        'branch_id',
         'order_number',
         'table_id', 
         'customer_id',

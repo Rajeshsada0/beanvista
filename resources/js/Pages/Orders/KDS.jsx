@@ -40,6 +40,13 @@ const getElapsedMins = (start, end = new Date()) => {
     return Math.max(0, Math.floor(diffMs / 60000));
 };
 
+const formatKdsOrderNumber = (order) => {
+    if (!order) return '';
+    const raw = (order.display_number || order.order_number || `#${order.id || ''}`).toString().trim();
+    const clean = raw.replace(/^#+/, '');
+    return clean ? `#${clean}` : `#${order.id || ''}`;
+};
+
 export default function KDS({ items, kds_warning_mins = 10, kds_critical_mins = 20 }) {
     const { auth } = usePage().props;
     const [currentTime, setCurrentTime] = useState(new Date());
@@ -166,7 +173,8 @@ export default function KDS({ items, kds_warning_mins = 10, kds_critical_mins = 
     const filteredItems = items.filter(item => {
         const tableNum = item.order?.table?.table_number || '';
         const orderType = item.order?.order_type || '';
-        const orderNum = item.order?.order_number || '';
+        const orderNum = formatKdsOrderNumber(item.order);
+        const orderNumRaw = (item.order?.order_number || item.order?.id || '').toString();
         const menuName = item.menu?.name || '';
         const customerName = item.order?.customer?.name || '';
         const waiterName = item.order?.waiter?.name || '';
@@ -177,6 +185,7 @@ export default function KDS({ items, kds_warning_mins = 10, kds_critical_mins = 
             tableNum.toLowerCase().includes(q) ||
             orderType.toLowerCase().includes(q) ||
             orderNum.toLowerCase().includes(q) ||
+            orderNumRaw.toLowerCase().includes(q) ||
             menuName.toLowerCase().includes(q) ||
             customerName.toLowerCase().includes(q) ||
             waiterName.toLowerCase().includes(q);
@@ -529,7 +538,7 @@ export default function KDS({ items, kds_warning_mins = 10, kds_critical_mins = 
                                                         <p className={`text-[10px] font-black uppercase tracking-wider leading-none ${
                                                             theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
                                                         }`}>
-                                                            Order #{orderGroup.order.order_number || orderGroup.order.id.toString().slice(-8)}
+                                                            Order {formatKdsOrderNumber(orderGroup.order)}
                                                         </p>
                                                         <span className={`px-2 py-0.5 text-[8px] font-black rounded uppercase border tracking-wider leading-none ${
                                                             orderGroup.order.status === 'completed' 
@@ -763,7 +772,7 @@ export default function KDS({ items, kds_warning_mins = 10, kds_critical_mins = 
                                                         <p className={`text-[10px] font-black uppercase tracking-wider leading-none ${
                                                             theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
                                                         }`}>
-                                                            Order #{item.order.order_number || item.order.id.toString().slice(-8)}
+                                                            Order {formatKdsOrderNumber(item.order)}
                                                         </p>
                                                         {getElapsedMins(item.created_at, currentTime) < 1 && (
                                                             <span className="px-1.5 py-0.5 bg-blue-500 text-white text-[8px] font-black rounded uppercase animate-bounce leading-none">New</span>
@@ -934,7 +943,7 @@ export default function KDS({ items, kds_warning_mins = 10, kds_critical_mins = 
                             <div>
                                 <div className="flex items-center gap-2">
                                     <h2 className={`text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                                        Order {selectedOrder.order_number || selectedOrder.id.toString().slice(-8)}
+                                        Order {formatKdsOrderNumber(selectedOrder)}
                                     </h2>
                                     <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${selectedOrder.status === 'completed' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
                                         {selectedOrder.status === 'completed' ? 'Paid' : 'Unpaid'}

@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
-import { Settings, Globe, Palette, Languages, Save, Image as ImageIcon, CheckCircle2, Info, Star, ChefHat, AlertTriangle, Printer, FileText, UserCheck, QrCode, Zap, ArrowUp, Edit3 } from 'lucide-react';
+import { Settings, Globe, Palette, Languages, Save, Image as ImageIcon, CheckCircle2, Info, Star, ChefHat, AlertTriangle, Printer, FileText, UserCheck, QrCode, Zap, ArrowUp, Edit3, Share2, Wifi } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 export default function SettingIndex({ settings }) {
@@ -24,6 +24,17 @@ export default function SettingIndex({ settings }) {
         address: settings.address || '',
         enable_guest_qr: settings.enable_guest_qr === 'true' || settings.enable_guest_qr === true || settings.enable_guest_qr === '1' || settings.enable_guest_qr === 1,
         enable_completed_order_edit: settings.enable_completed_order_edit === 'true' || settings.enable_completed_order_edit === true || settings.enable_completed_order_edit === '1' || settings.enable_completed_order_edit === 1,
+        enable_social_links: settings.enable_social_links === undefined ? true : (settings.enable_social_links === 'true' || settings.enable_social_links === true || settings.enable_social_links === '1' || settings.enable_social_links === 1),
+        social_heading: settings.social_heading || 'Follow & Review Us',
+        social_subheading: settings.social_subheading || 'Loved our food & drinks? Follow our social channels and leave a review!',
+        social_google_review: settings.social_google_review || '',
+        social_instagram: settings.social_instagram || '',
+        social_facebook: settings.social_facebook || '',
+        social_tiktok: settings.social_tiktok || '',
+        social_youtube: settings.social_youtube || '',
+        social_whatsapp: settings.social_whatsapp || '',
+        social_wifi_ssid: settings.social_wifi_ssid || '',
+        social_wifi_password: settings.social_wifi_password || '',
         site_logo: null,
         site_favicon: null,
         mail_host: settings.mail_host || '',
@@ -309,6 +320,179 @@ export default function SettingIndex({ settings }) {
                                     placeholder="e.g. +977 1 4XXXXXX"
                                 />
                                 <p className="mt-1 text-xs text-gray-500">This number appears on the public booking page.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Social Media & Customer Engagement (Guest QR) Section */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+                            <div className="flex items-center gap-2">
+                                <Share2 className="w-5 h-5 text-pink-500" />
+                                <div>
+                                    <h2 className="text-base font-bold text-gray-900">Social Media & Review Links (Guest QR)</h2>
+                                    <p className="text-xs text-gray-500">Configure links shown on the table QR menu to boost followers and Google reviews.</p>
+                                </div>
+                            </div>
+                            <div 
+                                onClick={() => setData('enable_social_links', !data.enable_social_links)}
+                                className="flex items-center gap-2 cursor-pointer"
+                            >
+                                <span className="text-xs font-bold text-gray-600 hidden sm:inline">
+                                    {data.enable_social_links ? 'Enabled' : 'Disabled'}
+                                </span>
+                                <div className={`shrink-0 w-11 h-6 rounded-full relative transition-all duration-300 ${data.enable_social_links ? 'bg-pink-600' : 'bg-gray-200'}`}>
+                                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-300 ${data.enable_social_links ? 'left-6' : 'left-1'}`}></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className={`p-4 space-y-4 ${!data.enable_social_links ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Section Heading</label>
+                                    <input
+                                        type="text"
+                                        value={data.social_heading}
+                                        onChange={e => setData('social_heading', e.target.value)}
+                                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                                        placeholder="e.g. Follow & Review Us"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Subheading / Call-to-Action</label>
+                                    <input
+                                        type="text"
+                                        value={data.social_subheading}
+                                        onChange={e => setData('social_subheading', e.target.value)}
+                                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                                        placeholder="e.g. Tag us in your photos & rate your experience!"
+                                    />
+                                </div>
+
+                                {/* Google Review - Highlighted */}
+                                <div className="md:col-span-2 p-3.5 rounded-xl bg-amber-50/70 border border-amber-200">
+                                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                                        <div className="flex items-center gap-1.5">
+                                            <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
+                                            <label className="block text-xs font-black text-amber-900">Google Review / Google Maps Link</label>
+                                        </div>
+                                        <span className="text-[10px] font-black uppercase tracking-wider bg-amber-200/90 text-amber-800 px-2 py-0.5 rounded-md">Top Recommended</span>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={data.social_google_review}
+                                        onChange={e => setData('social_google_review', e.target.value)}
+                                        className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all"
+                                        placeholder="e.g. https://g.page/r/.../review or https://maps.app.goo.gl/..."
+                                    />
+                                    <p className="mt-1 text-[11px] text-amber-700 font-medium">Guests will see a 5-star rating button that opens this direct Google review link.</p>
+                                </div>
+
+                                {/* Instagram */}
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-pink-500"></span>
+                                        Instagram Profile / Handle
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={data.social_instagram}
+                                        onChange={e => setData('social_instagram', e.target.value)}
+                                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                                        placeholder="e.g. https://instagram.com/mycafe or @mycafe"
+                                    />
+                                </div>
+
+                                {/* Facebook */}
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                                        Facebook Page Link
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={data.social_facebook}
+                                        onChange={e => setData('social_facebook', e.target.value)}
+                                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                                        placeholder="e.g. https://facebook.com/mycafe"
+                                    />
+                                </div>
+
+                                {/* TikTok */}
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-slate-900"></span>
+                                        TikTok Profile / Handle
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={data.social_tiktok}
+                                        onChange={e => setData('social_tiktok', e.target.value)}
+                                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                                        placeholder="e.g. https://tiktok.com/@mycafe or @mycafe"
+                                    />
+                                </div>
+
+                                {/* YouTube */}
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-red-600"></span>
+                                        YouTube Channel Link
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={data.social_youtube}
+                                        onChange={e => setData('social_youtube', e.target.value)}
+                                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                                        placeholder="e.g. https://youtube.com/@mycafe"
+                                    />
+                                </div>
+
+                                {/* WhatsApp */}
+                                <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                        WhatsApp Chat Number or Link
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={data.social_whatsapp}
+                                        onChange={e => setData('social_whatsapp', e.target.value)}
+                                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                                        placeholder="e.g. 98XXXXXXXX or https://wa.me/97798..."
+                                    />
+                                </div>
+
+                                {/* WiFi Details */}
+                                <div className="md:col-span-2 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Wifi className="w-4 h-4 text-slate-700" />
+                                        <label className="block text-xs font-bold text-slate-900">Guest WiFi Details (Optional)</label>
+                                        <span className="text-[10px] text-slate-500">Displayed on the guest menu with a 1-tap "Copy Password" button</span>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">WiFi Network Name (SSID)</label>
+                                            <input
+                                                type="text"
+                                                value={data.social_wifi_ssid}
+                                                onChange={e => setData('social_wifi_ssid', e.target.value)}
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                                                placeholder="e.g. BeanVista_Guest"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">WiFi Password</label>
+                                            <input
+                                                type="text"
+                                                value={data.social_wifi_password}
+                                                onChange={e => setData('social_wifi_password', e.target.value)}
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                                                placeholder="e.g. coffee123"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

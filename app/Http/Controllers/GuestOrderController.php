@@ -22,10 +22,18 @@ class GuestOrderController extends Controller
     {
         $tenant = \App\Models\Tenant::where('slug', $tenantSlug)->firstOrFail();
         
-        $table = Table::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+        $table = Table::withoutGlobalScopes()
             ->where('tenant_id', $tenant->id)
             ->where('table_number', $tableNumber)
             ->firstOrFail();
+
+        if (!$table->branch_id) {
+            $defaultBranchId = \App\Models\Branch::where('tenant_id', $tenant->id)->value('id');
+            if ($defaultBranchId) {
+                $table->update(['branch_id' => $defaultBranchId]);
+                $table->branch_id = $defaultBranchId;
+            }
+        }
 
         $menus = Menu::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
             ->where('tenant_id', $tenant->id)
@@ -38,7 +46,7 @@ class GuestOrderController extends Controller
             ->with('menuItem')
             ->get();
 
-        $currentOrder = Order::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+        $currentOrder = Order::withoutGlobalScopes()
             ->where('tenant_id', $tenant->id)
             ->where('table_id', $table->id)
             ->whereNotIn('status', ['completed', 'cancelled'])
@@ -47,7 +55,7 @@ class GuestOrderController extends Controller
             ->first();
 
         if (!$currentOrder) {
-            $currentOrder = Order::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+            $currentOrder = Order::withoutGlobalScopes()
                 ->where('tenant_id', $tenant->id)
                 ->where('table_id', $table->id)
                 ->where('status', 'cancelled')
@@ -101,6 +109,11 @@ class GuestOrderController extends Controller
             ->orderBy('sort_order')
             ->get();
 
+        $settings = \App\Models\Setting::where('tenant_id', $tenant->id)->pluck('value', 'key')->toArray();
+        if (empty($settings['site_name'])) {
+            $settings['site_name'] = $tenant->name ?? 'CaféOS';
+        }
+
         return Inertia::render('Menu/GuestMenuView', [
             'table' => $table,
             'menus' => $menus,
@@ -108,6 +121,7 @@ class GuestOrderController extends Controller
             'banners' => $banners,
             'currentOrder' => $currentOrder,
             'persistedCustomer' => $persistedCustomer,
+            'settings' => $settings,
         ]);
     }
 
@@ -183,12 +197,18 @@ class GuestOrderController extends Controller
             'customer_id' => 'nullable|exists:customers,id'
         ]);
 
-        $table = Table::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+        $table = Table::withoutGlobalScopes()
             ->where('tenant_id', $tenant->id)
             ->findOrFail($tableId);
 
+        $branchId = $table->branch_id ?: \App\Models\Branch::where('tenant_id', $tenant->id)->value('id');
+        if ($branchId && !$table->branch_id) {
+            $table->update(['branch_id' => $branchId]);
+            $table->branch_id = $branchId;
+        }
+
         // Check if there's already an active order for this table (excluding completed & cancelled)
-        $order = Order::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+        $order = Order::withoutGlobalScopes()
             ->where('tenant_id', $tenant->id)
             ->where('table_id', $tableId)
             ->whereNotIn('status', ['completed', 'cancelled'])
@@ -199,8 +219,9 @@ class GuestOrderController extends Controller
                 return back()->with('error', 'This cafe has reached its monthly order limit for the current plan or free trial. Please notify the staff.');
             }
 
-            $order = Order::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)->create([
+            $order = Order::withoutGlobalScopes()->create([
                 'tenant_id' => $tenant->id,
+                'branch_id' => $branchId,
                 'table_id' => $tableId,
                 'customer_id' => $request->customer_id,
                 'status' => 'pending',
@@ -208,6 +229,8 @@ class GuestOrderController extends Controller
                 'grand_total' => 0,
             ]);
             // Table status update is now handled by Order model's created hook
+        } elseif (!$order->branch_id && $branchId) {
+            $order->update(['branch_id' => $branchId]);
         }
 
         foreach ($validated['items'] as $itemData) {
@@ -232,7 +255,7 @@ class GuestOrderController extends Controller
                 }
             }
 
-            OrderItem::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)->create([
+            OrderItem::withoutGlobalScopes()->create([
                 'tenant_id' => $tenant->id,
                 'order_id' => $order->id,
                 'menu_id' => $menu->id,
@@ -240,6 +263,7 @@ class GuestOrderController extends Controller
                 'price' => $price,
                 'is_redeemed' => $isRedeemed,
                 'points_cost' => $pointsCost,
+                'kds_status' => $menu->send_to_kitchen ? 'pending' : 'delivered',
             ]);
         }
 

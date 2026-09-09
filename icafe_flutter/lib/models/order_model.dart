@@ -73,7 +73,7 @@ class OrderModel {
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     return OrderModel(
       id: JsonUtils.parseInt(json['id']),
-      orderNumber: json['order_number'] ?? '#${json['id']}',
+      orderNumber: (json['display_number'] ?? json['order_number'] ?? json['number'] ?? '#${json['id']}').toString(),
       tableId: JsonUtils.parseIntNullable(json['table_id']),
       customerId: JsonUtils.parseIntNullable(json['customer_id']),
       waiterId: JsonUtils.parseIntNullable(json['waiter_id']),

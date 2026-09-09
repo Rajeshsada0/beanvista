@@ -35,7 +35,9 @@ class BannerController extends Controller
         if ($request->hasFile('image')) {
             $tenantId = auth()->user()->tenant_id;
             $validated['image_path'] = $this->compressAndSaveImage($request->file('image'), "tenants/{$tenantId}/banners");
-        } elseif (is_string($request->image)) {
+        } elseif ($request->image === '__REMOVE__') {
+            $validated['image_path'] = null;
+        } elseif (is_string($request->image) && $request->image !== '') {
             $validated['image_path'] = $request->image;
         }
 
@@ -66,6 +68,11 @@ class BannerController extends Controller
             }
             $tenantId = auth()->user()->tenant_id;
             $validated['image_path'] = $this->compressAndSaveImage($request->file('image'), "tenants/{$tenantId}/banners");
+        } elseif ($request->image === '__REMOVE__') {
+            if ($banner->image_path) {
+                Storage::disk('public')->delete($banner->image_path);
+            }
+            $validated['image_path'] = null;
         } elseif (is_string($request->image) && $request->image !== '') {
             $validated['image_path'] = $request->image;
         }

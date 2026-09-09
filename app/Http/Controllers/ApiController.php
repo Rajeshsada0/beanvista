@@ -583,7 +583,9 @@ class ApiController extends Controller
                 'status' => $status,
                 'order' => $activeOrder ? [
                     'id' => $activeOrder->id,
-                    'number' => $activeOrder->order_number,
+                    'number' => $activeOrder->display_number ?: ($activeOrder->order_number ?: "#{$activeOrder->id}"),
+                    'order_number' => $activeOrder->display_number ?: ($activeOrder->order_number ?: "#{$activeOrder->id}"),
+                    'display_number' => $activeOrder->display_number ?: ($activeOrder->order_number ?: "#{$activeOrder->id}"),
                     'items' => $activeOrder->items->sum('quantity'),
                     'total' => (float)$activeOrder->grand_total,
                     'waiter' => $activeOrder->waiter ? $activeOrder->waiter->name : 'N/A',
@@ -786,9 +788,12 @@ class ApiController extends Controller
         return response()->json([
             'success' => true,
             'data' => $orders->map(function($o) {
+                $orderNum = $o->display_number ?: ($o->order_number ?: "#{$o->id}");
                 return [
                     'id' => $o->id,
-                    'number' => $o->order_number,
+                    'number' => $orderNum,
+                    'order_number' => $orderNum,
+                    'display_number' => $orderNum,
                     'type' => $o->order_type,
                     'typeIcon' => $o->order_type === 'Dine-In' ? '🍽️' : ($o->order_type === 'Takeaway' ? '🥡' : '🚚'),
                     'table' => $o->table ? $o->table->table_number : 'Takeaway',
@@ -1107,10 +1112,13 @@ class ApiController extends Controller
                 $order
             );
 
+            $createdNum = $order->display_number ?: ($order->order_number ?: "#{$order->id}");
             return response()->json([
                 'success' => true,
                 'order_id' => $order->id,
-                'order_number' => $order->order_number,
+                'number' => $createdNum,
+                'order_number' => $createdNum,
+                'display_number' => $createdNum,
             ]);
         } catch (\Exception $e) {
             \Log::error("createOrder failed: " . $e->getMessage() . "\n" . $e->getTraceAsString());
@@ -1594,11 +1602,14 @@ class ApiController extends Controller
     {
         $order = Order::with(['table', 'items.menu', 'customer', 'bankAccount'])->findOrFail($id);
 
+        $showNum = $order->display_number ?: ($order->order_number ?: "#{$order->id}");
         return response()->json([
             'success' => true,
             'data' => [
                 'id' => $order->id,
-                'number' => $order->order_number,
+                'number' => $showNum,
+                'order_number' => $showNum,
+                'display_number' => $showNum,
                 'type' => $order->order_type,
                 'typeIcon' => $order->order_type === 'Dine-In' ? '🍽️' : ($order->order_type === 'Takeaway' ? '🥡' : '🚚'),
                 'table' => $order->table ? $order->table->table_number : 'Takeaway',

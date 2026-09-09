@@ -10,7 +10,7 @@ class Table extends Model
 {
     use BelongsToTenant, \App\Traits\BelongsToBranch;
 
-    protected $fillable = ['table_number', 'capacity', 'status'];
+    protected $fillable = ['tenant_id', 'branch_id', 'table_number', 'capacity', 'status'];
 
     public function reservations()
     {

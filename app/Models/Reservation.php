@@ -10,7 +10,7 @@ class Reservation extends Model
 {
     use BelongsToTenant, \App\Traits\BelongsToBranch;
 
-    protected $fillable = ['tenant_id', 'table_id', 'customer_name', 'phone', 'booking_time', 'status', 'guests_count'];
+    protected $fillable = ['tenant_id', 'branch_id', 'table_id', 'customer_name', 'phone', 'booking_time', 'status', 'guests_count'];
 
     protected $casts = [
         'booking_time' => 'datetime',

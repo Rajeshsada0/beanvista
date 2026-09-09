@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_notification.dart';
 import '../../core/utils/json_utils.dart';
 import '../../providers/finance_provider.dart';
 import 'finance_reports_screens.dart';
@@ -15,7 +16,12 @@ String _fmt(double v) => '${AppConstants.currencySymbol} ${_currencyFmt.format(v
 
 class FinanceScreen extends StatefulWidget {
   final bool showAddBankAccount;
-  const FinanceScreen({super.key, this.showAddBankAccount = false});
+  final int initialTabIndex;
+  const FinanceScreen({
+    super.key,
+    this.showAddBankAccount = false,
+    this.initialTabIndex = 0,
+  });
 
   @override
   State<FinanceScreen> createState() => _FinanceScreenState();
@@ -28,7 +34,11 @@ class _FinanceScreenState extends State<FinanceScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: widget.showAddBankAccount ? 3 : widget.initialTabIndex.clamp(0, 3),
+    );
     _tabController.addListener(() => setState(() {}));
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1731,9 +1741,17 @@ class _CashCounterTab extends StatelessWidget {
                   final success = await provider.openCashRegister(bal, notesCtrl.text.trim());
                   if (success && ctx.mounted) {
                     Navigator.pop(ctx);
-                    showTopSnackBar(context, SnackBar(content: Text('Cash register opened successfully'), backgroundColor: AppColors.statusGreen));
+                    AppNotification.success(
+                      context,
+                      title: 'Cash register opened successfully',
+                      message: 'Drawer balance initialized to ${_fmt(bal)}.',
+                    );
                   } else if (ctx.mounted) {
-                    showTopSnackBar(context, SnackBar(content: Text(provider.error ?? 'Failed to open register'), backgroundColor: AppColors.statusRed));
+                    AppNotification.error(
+                      context,
+                      title: 'Failed to open register',
+                      message: provider.error ?? 'Unable to open drawer session.',
+                    );
                   }
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.statusGreen, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
@@ -1836,9 +1854,17 @@ class _CashCounterTab extends StatelessWidget {
                   final success = await provider.closeCashRegister(sessionId, bal, notesCtrl.text.trim());
                   if (success && ctx.mounted) {
                     Navigator.pop(ctx);
-                    showTopSnackBar(context, SnackBar(content: Text('Cash register closed and reconciled'), backgroundColor: AppColors.statusGreen));
+                    AppNotification.success(
+                      context,
+                      title: 'Cash register closed and reconciled',
+                      message: 'The cash register has been successfully closed for today.',
+                    );
                   } else if (ctx.mounted) {
-                    showTopSnackBar(context, SnackBar(content: Text(provider.error ?? 'Failed to close register'), backgroundColor: AppColors.statusRed));
+                    AppNotification.error(
+                      context,
+                      title: 'Failed to close register',
+                      message: provider.error ?? 'Unable to reconcile drawer session.',
+                    );
                   }
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.statusRed, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),

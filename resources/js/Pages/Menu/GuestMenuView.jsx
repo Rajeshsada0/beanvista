@@ -23,14 +23,85 @@ import {
     Sparkles,
     Check,
     Tag,
-    ChevronLeft
+    ChevronLeft,
+    Share2,
+    Wifi,
+    Copy,
+    ExternalLink,
+    ThumbsUp,
+    Heart,
+    MessageCircle
 } from 'lucide-react';
 import axios from 'axios';
 
-export default function GuestMenuView({ table, menus, rewards, banners = [], settings, tenant_slug }) {
+export default function GuestMenuView({ table, menus, rewards, banners = [], settings: propSettings, tenant_slug }) {
     // Destructure Inertia page props once at top level
-    const { currentOrder: currentOrderProp, persistedCustomer, flash } = usePage().props;
-    const currency = settings?.currency_symbol || 'रू.';
+    const { currentOrder: currentOrderProp, persistedCustomer, flash, settings: sharedSettings } = usePage().props;
+    const pageSettings = propSettings || sharedSettings || {};
+    const settings = pageSettings;
+    const currency = pageSettings?.currency_symbol || 'रू.';
+    const cafeName = pageSettings?.site_name || pageSettings?.tenant_name || 'Cafe';
+
+    const isSocialEnabled = pageSettings?.enable_social_links === undefined || 
+        pageSettings?.enable_social_links === true || 
+        pageSettings?.enable_social_links === 'true' || 
+        pageSettings?.enable_social_links === '1' || 
+        pageSettings?.enable_social_links === 1;
+
+    const googleReviewUrl = pageSettings?.social_google_review?.trim() || '';
+    const instagramVal    = pageSettings?.social_instagram?.trim() || '';
+    const facebookVal     = pageSettings?.social_facebook?.trim() || '';
+    const tiktokVal       = pageSettings?.social_tiktok?.trim() || '';
+    const youtubeVal      = pageSettings?.social_youtube?.trim() || '';
+    const whatsappVal     = pageSettings?.social_whatsapp?.trim() || '';
+    const wifiSsid        = pageSettings?.social_wifi_ssid?.trim() || '';
+    const wifiPassword    = pageSettings?.social_wifi_password?.trim() || '';
+    const socialHeading   = pageSettings?.social_heading || 'Connect With Us';
+    const socialSubheading = pageSettings?.social_subheading || 'Follow our socials, leave a review, or enjoy free cafe WiFi while you dine.';
+
+    const hasAnySocial = Boolean(googleReviewUrl || instagramVal || facebookVal || tiktokVal || youtubeVal || whatsappVal || wifiSsid || wifiPassword);
+
+    const [wifiCopied, setWifiCopied] = useState(false);
+    const copyWifiPassword = () => {
+        if (!wifiPassword) return;
+        navigator.clipboard.writeText(wifiPassword).then(() => {
+            setWifiCopied(true);
+            setTimeout(() => setWifiCopied(false), 2000);
+        }).catch(() => prompt('WiFi Password:', wifiPassword));
+    };
+
+    const formatInstagramUrl = (val) => {
+        if (!val) return '';
+        if (val.startsWith('http')) return val;
+        const clean = val.replace(/^@/, '');
+        return `https://instagram.com/${clean}`;
+    };
+
+    const formatFacebookUrl = (val) => {
+        if (!val) return '';
+        if (val.startsWith('http')) return val;
+        return `https://facebook.com/${val}`;
+    };
+
+    const formatTikTokUrl = (val) => {
+        if (!val) return '';
+        if (val.startsWith('http')) return val;
+        const clean = val.replace(/^@/, '');
+        return `https://tiktok.com/@${clean}`;
+    };
+
+    const formatYoutubeUrl = (val) => {
+        if (!val) return '';
+        if (val.startsWith('http')) return val;
+        return val.startsWith('@') ? `https://youtube.com/${val}` : `https://youtube.com/@${val}`;
+    };
+
+    const formatWhatsappUrl = (val) => {
+        if (!val) return '';
+        if (val.startsWith('http')) return val;
+        const digits = val.replace(/\D/g, '');
+        return `https://wa.me/${digits}`;
+    };
 
     // State Hooks
     const [cart, setCart] = useState([]);
@@ -334,11 +405,11 @@ export default function GuestMenuView({ table, menus, rewards, banners = [], set
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
                     <div className="flex items-center space-x-3 min-w-0">
                         <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-white font-black text-lg shadow-md shadow-orange-500/20 shrink-0">
-                            {settings?.site_name ? settings.site_name.charAt(0) : 'C'}
+                            {pageSettings?.site_name ? pageSettings.site_name.charAt(0) : 'C'}
                         </div>
                         <div className="min-w-0">
                             <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900 truncate leading-tight">
-                                {settings?.site_name || 'CaféOS'}
+                                {pageSettings?.site_name || 'CaféOS'}
                             </h1>
                             <div className="flex items-center space-x-1.5 mt-0.5">
                                 <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-100 text-[10px] font-extrabold uppercase tracking-wider">
@@ -575,6 +646,41 @@ export default function GuestMenuView({ table, menus, rewards, banners = [], set
                                 {currency} {Number(activeOrder.grand_total || activeOrder.items?.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.quantity || 1)), 0) || 0).toFixed(2)}
                             </span>
                         </div>
+
+                        {/* Quick Review / Social nudge while waiting */}
+                        {isSocialEnabled && (googleReviewUrl || instagramVal) && activeOrder.status !== 'cancelled' && (
+                            <div className="mt-3 pt-3 border-t border-dashed border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-orange-50/50 -mx-5 -mb-5 p-4 rounded-b-3xl">
+                                <div className="flex items-center space-x-2 text-center sm:text-left">
+                                    <span className="text-base">⭐</span>
+                                    <p className="text-[11px] font-bold text-slate-700">
+                                        Waiting for your order? Check out our Instagram or leave a quick review!
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                    {googleReviewUrl && (
+                                        <a
+                                            href={googleReviewUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white border border-amber-200 shadow-sm text-amber-700 text-[10px] font-black hover:bg-amber-50 transition-colors"
+                                        >
+                                            <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                                            Review Us
+                                        </a>
+                                    )}
+                                    {instagramVal && (
+                                        <a
+                                            href={formatInstagramUrl(instagramVal)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] font-black hover:brightness-110 transition-all shadow-sm"
+                                        >
+                                            Instagram
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1038,6 +1144,227 @@ export default function GuestMenuView({ table, menus, rewards, banners = [], set
                         )}
                     </div>
                 )}
+
+                {/* Social Media, Reviews & WiFi Section */}
+                {isSocialEnabled && hasAnySocial && (
+                    <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-sm space-y-5 animate-in fade-in duration-300">
+                        {/* Section Heading */}
+                        <div className="text-center max-w-sm mx-auto space-y-1">
+                            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-orange-50 text-orange-600 border border-orange-100 text-[10px] font-black uppercase tracking-widest">
+                                <Heart className="w-3 h-3 fill-orange-500 text-orange-500" />
+                                <span>Stay Connected</span>
+                            </div>
+                            <h3 className="text-base sm:text-lg font-black tracking-tight text-slate-900">
+                                {socialHeading}
+                            </h3>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                                {socialSubheading}
+                            </p>
+                        </div>
+
+                        {/* Google Review Card / CTA */}
+                        {googleReviewUrl && (
+                            <a
+                                href={googleReviewUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group block p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-200/70 hover:border-amber-400 hover:shadow-md transition-all active:scale-[0.99]"
+                            >
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center space-x-3 min-w-0">
+                                        <div className="w-11 h-11 rounded-2xl bg-white shadow-sm flex items-center justify-center shrink-0 border border-amber-100">
+                                            {/* Google G Icon */}
+                                            <svg className="w-6 h-6" viewBox="0 0 24 24">
+                                                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                                                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                                                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                                                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                                            </svg>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="flex items-center space-x-1 mb-0.5">
+                                                <div className="flex items-center text-amber-400">
+                                                    {[...Array(5)].map((_, i) => (
+                                                        <Star key={i} className="w-3.5 h-3.5 fill-amber-400" />
+                                                    ))}
+                                                </div>
+                                                <span className="text-[10px] font-black text-amber-700 bg-amber-100/80 px-1.5 py-0.5 rounded uppercase">5.0</span>
+                                            </div>
+                                            <h4 className="text-xs font-black text-slate-900 group-hover:text-orange-600 transition-colors truncate">
+                                                Love your visit? Leave a Google Review
+                                            </h4>
+                                            <p className="text-[11px] text-slate-500 font-medium truncate">
+                                                Your feedback helps us serve you better!
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="shrink-0 flex items-center justify-center w-8 h-8 rounded-xl bg-white shadow-sm text-slate-400 group-hover:text-orange-600 group-hover:scale-105 transition-all">
+                                        <ExternalLink className="w-4 h-4" />
+                                    </div>
+                                </div>
+                            </a>
+                        )}
+
+                        {/* Social Follower Buttons Grid */}
+                        {(instagramVal || facebookVal || tiktokVal || youtubeVal || whatsappVal) && (
+                            <div className="space-y-2">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Follow & Message Us</p>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                                    {instagramVal && (
+                                        <a
+                                            href={formatInstagramUrl(instagramVal)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center space-x-2.5 p-3 rounded-2xl bg-gradient-to-tr from-pink-500/10 via-purple-500/10 to-orange-500/10 border border-pink-200/50 hover:border-pink-300 hover:shadow-sm transition-all group active:scale-95"
+                                        >
+                                            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white shadow-sm shrink-0">
+                                                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                                                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                                                </svg>
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-[11px] font-black text-slate-800 group-hover:text-pink-600 transition-colors truncate">Instagram</p>
+                                                <p className="text-[10px] text-slate-400 font-bold truncate">{instagramVal.startsWith('@') ? instagramVal : `@${instagramVal}`}</p>
+                                            </div>
+                                        </a>
+                                    )}
+
+                                    {facebookVal && (
+                                        <a
+                                            href={formatFacebookUrl(facebookVal)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center space-x-2.5 p-3 rounded-2xl bg-blue-50/60 border border-blue-200/60 hover:border-blue-300 hover:shadow-sm transition-all group active:scale-95"
+                                        >
+                                            <div className="w-8 h-8 rounded-xl bg-[#1877F2] flex items-center justify-center text-white shadow-sm shrink-0">
+                                                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                                                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                                                </svg>
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-[11px] font-black text-slate-800 group-hover:text-blue-600 transition-colors truncate">Facebook</p>
+                                                <p className="text-[10px] text-slate-400 font-bold truncate">Follow Us</p>
+                                            </div>
+                                        </a>
+                                    )}
+
+                                    {tiktokVal && (
+                                        <a
+                                            href={formatTikTokUrl(tiktokVal)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center space-x-2.5 p-3 rounded-2xl bg-slate-900/5 border border-slate-200 hover:border-slate-400 hover:shadow-sm transition-all group active:scale-95"
+                                        >
+                                            <div className="w-8 h-8 rounded-xl bg-black flex items-center justify-center text-white shadow-sm shrink-0">
+                                                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                                                    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.298-.002.595.042.88.13V9.4a6.33 6.33 0 0 0-1-.08A6.34 6.34 0 0 0 3 15.66a6.34 6.34 0 0 0 10.86 4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-.04-4.52z"/>
+                                                </svg>
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-[11px] font-black text-slate-800 group-hover:text-black transition-colors truncate">TikTok</p>
+                                                <p className="text-[10px] text-slate-400 font-bold truncate">{tiktokVal.startsWith('@') ? tiktokVal : `@${tiktokVal}`}</p>
+                                            </div>
+                                        </a>
+                                    )}
+
+                                    {youtubeVal && (
+                                        <a
+                                            href={formatYoutubeUrl(youtubeVal)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center space-x-2.5 p-3 rounded-2xl bg-rose-50/60 border border-rose-200/60 hover:border-rose-300 hover:shadow-sm transition-all group active:scale-95"
+                                        >
+                                            <div className="w-8 h-8 rounded-xl bg-[#FF0000] flex items-center justify-center text-white shadow-sm shrink-0">
+                                                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                                                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                                                </svg>
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-[11px] font-black text-slate-800 group-hover:text-rose-600 transition-colors truncate">YouTube</p>
+                                                <p className="text-[10px] text-slate-400 font-bold truncate">Subscribe</p>
+                                            </div>
+                                        </a>
+                                    )}
+
+                                    {whatsappVal && (
+                                        <a
+                                            href={formatWhatsappUrl(whatsappVal)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center space-x-2.5 p-3 rounded-2xl bg-emerald-50/60 border border-emerald-200/60 hover:border-emerald-300 hover:shadow-sm transition-all group active:scale-95"
+                                        >
+                                            <div className="w-8 h-8 rounded-xl bg-[#25D366] flex items-center justify-center text-white shadow-sm shrink-0">
+                                                <MessageCircle className="w-4 h-4" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-[11px] font-black text-slate-800 group-hover:text-emerald-600 transition-colors truncate">WhatsApp</p>
+                                                <p className="text-[10px] text-slate-400 font-bold truncate">Chat with Us</p>
+                                            </div>
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Complimentary Guest WiFi Card */}
+                        {(wifiSsid || wifiPassword) && (
+                            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3">
+                                <div className="flex items-center space-x-3 min-w-0">
+                                    <div className="w-10 h-10 rounded-xl bg-orange-100/70 text-orange-600 flex items-center justify-center shrink-0">
+                                        <Wifi className="w-5 h-5" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Complimentary Guest WiFi</p>
+                                        <p className="text-xs font-black text-slate-900 truncate">
+                                            SSID: <span className="text-orange-600 font-bold">{wifiSsid || 'Cafe Guest WiFi'}</span>
+                                        </p>
+                                        {wifiPassword && (
+                                            <p className="text-[11px] text-slate-500 font-mono mt-0.5 truncate">
+                                                Password: <span className="font-bold text-slate-700">{wifiPassword}</span>
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {wifiPassword && (
+                                    <button
+                                        type="button"
+                                        onClick={copyWifiPassword}
+                                        className="shrink-0 flex items-center space-x-1.5 px-3 py-2 bg-white hover:bg-orange-50 text-slate-700 hover:text-orange-600 border border-slate-200 hover:border-orange-200 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm transition-all active:scale-95"
+                                    >
+                                        {wifiCopied ? (
+                                            <>
+                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                                <span className="text-emerald-600">Copied!</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Copy className="w-3.5 h-3.5" />
+                                                <span>Copy</span>
+                                            </>
+                                        )}
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Branded Cafe Footer */}
+                <footer className="text-center py-6 border-t border-slate-200/60 space-y-2">
+                    <div className="flex items-center justify-center space-x-2 text-slate-400">
+                        <Utensils className="w-3.5 h-3.5" />
+                        <span className="text-xs font-black uppercase tracking-widest text-slate-600">{pageSettings?.site_name || 'CaféOS'}</span>
+                    </div>
+                    {pageSettings?.address && (
+                        <p className="text-[11px] text-slate-400 font-medium max-w-xs mx-auto">
+                            {pageSettings.address}
+                        </p>
+                    )}
+                    <p className="text-[10px] font-bold text-slate-400 tracking-wider">
+                        Thank you for dining with us!
+                    </p>
+                </footer>
             </main>
 
             {/* Sticky Bottom Floating Cart Bar */}
