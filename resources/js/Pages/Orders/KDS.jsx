@@ -259,7 +259,8 @@ export default function KDS({ items, kds_warning_mins = 10, kds_critical_mins = 
     // Calculate aggregated totals of active items (pending/preparing)
     const itemTotals = filteredItems.reduce((acc, item) => {
         const name = item.menu?.name || 'Unknown';
-        acc[name] = (acc[name] || 0) + item.quantity;
+        const qty = parseInt(item.quantity, 10) || 0;
+        acc[name] = (acc[name] || 0) + qty;
         return acc;
     }, {});
 
@@ -464,7 +465,7 @@ export default function KDS({ items, kds_warning_mins = 10, kds_critical_mins = 
                                     ? 'bg-slate-950/60 border-slate-800 text-slate-300' 
                                     : 'bg-slate-100 border-slate-200 text-slate-600'
                             }`}>
-                                {Object.values(itemTotals).reduce((a, b) => a + b, 0)} Total Items
+                                {Object.values(itemTotals).reduce((a, b) => (Number(a) || 0) + (Number(b) || 0), 0)} Total Items
                             </span>
                         </div>
                         <div className="flex items-center gap-3 overflow-x-auto pb-1.5 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
@@ -483,7 +484,7 @@ export default function KDS({ items, kds_warning_mins = 10, kds_critical_mins = 
                                             ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
                                             : 'bg-blue-50 text-blue-700 border-blue-200'
                                     }`}>
-                                        {qty}
+                                        {String(qty).padStart(2, '0')}
                                     </span>
                                 </div>
                             ))}

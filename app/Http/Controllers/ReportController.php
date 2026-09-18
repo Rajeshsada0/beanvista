@@ -122,20 +122,21 @@ class ReportController extends Controller
         
         $busiestHour = $hourCounts->sortDesc()->keys()->first();
 
-        // ── Top Items (MongoDB-compatible) ─────────────────────────────────
+        // ── Top Items / All Items (MongoDB-compatible) ─────────────────────
         $orderIds = $allOrders->pluck('id');
         $allItems = OrderItem::whereIn('order_id', $orderIds)->with('menu')->get();
         
         $topItems = $allItems->groupBy('menu_id')->map(function($items) {
+            $menu = $items->first()->menu;
             return [
                 'menu_id' => $items->first()->menu_id,
-                'menu' => $items->first()->menu,
-                'total_quantity' => $items->sum('quantity'),
-                'total_revenue' => $items->sum(function($item) {
+                'menu' => $menu,
+                'total_quantity' => (int) $items->sum('quantity'),
+                'total_revenue' => (float) $items->sum(function($item) {
                     return $item->quantity * $item->price;
                 })
             ];
-        })->sortByDesc('total_quantity')->take(10)->values();
+        })->sortByDesc('total_quantity')->values();
 
         // ── Sales by Table (MongoDB-compatible) ────────────────────────────
         $tableSales = $allOrders->filter(function($order) {
@@ -147,24 +148,96 @@ class ReportController extends Controller
                 'table_id' => $orders->first()->table_id,
                 'table_number' => $table ? $table->table_number : 'N/A',
                 'order_count' => $orders->count(),
-                'total_revenue' => $totalRevenue,
-                'avg_order_value' => $orders->avg('grand_total')
+                'total_revenue' => (float) $totalRevenue,
+                'avg_order_value' => (float) $orders->avg('grand_total')
             ];
         })->sortByDesc('total_revenue')->values();
 
-        // ── Sales by Payment Method (Bank Accounts) ────────────────────────────────
-        $paymentSales = $allOrders->groupBy('bank_account_id')->map(function($orders, $bankAccountId) {
-            $bankAccount = $orders->first()->bankAccount;
-            $name = $bankAccount ? $bankAccount->account_name . ($bankAccount->bank_name ? ' (' . $bankAccount->bank_name . ')' : '') : 'Uncategorized / ' . ucfirst($orders->first()->payment_method ?: 'Cash');
-            
-            return [
-                'bank_account_id' => $bankAccountId,
-                'name' => $name,
-                'order_count' => $orders->count(),
-                'total_revenue' => $orders->sum('grand_total'),
-                'avg_order_value' => $orders->avg('grand_total')
-            ];
-        })->sortByDesc('total_revenue')->values();
+        // ── Sales by Payment Method (Comprehensive) ────────────────────────
+        // 1. Group orders linked to specific bank accounts
+        $accountSales = $allOrders->filter(fn($o) => !empty($o->bank_account_id))
+            ->groupBy('bank_account_id')
+            ->map(function($orders, $bankAccountId) {
+                $bankAccount = $orders->first()->bankAccount;
+                $name = $bankAccount ? $bankAccount->account_name . ($bankAccount->bank_name ? ' (' . $bankAccount->bank_name . ')' : '') : 'Bank Account #' . $bankAccountId;
+                $type = $bankAccount?->account_type ?: 'online';
+                
+                return [
+                    'id' => 'account_' . $bankAccountId,
+                    'name' => $name,
+                    'type' => $type,
+                    'filter_key' => $type === 'cash' ? 'cash' : 'online',
+                    'order_count' => $orders->count(),
+                    'total_revenue' => (float) $orders->sum('grand_total'),
+                    'avg_order_value' => (float) $orders->avg('grand_total')
+                ];
+            });
+
+        // 2. Group orders without bank_account_id
+        $unassignedSales = $allOrders->filter(fn($o) => empty($o->bank_account_id))
+            ->groupBy(function($order) {
+                $hasCash = ($order->cash_amount ?? 0) > 0;
+                $hasOnline = ($order->online_amount ?? 0) > 0;
+                $due = max(0, $order->grand_total - ($order->cash_amount ?? 0) - ($order->online_amount ?? 0));
+                
+                if ($hasCash && $hasOnline) return 'split';
+                if ($hasCash) return 'cash';
+                if ($hasOnline) return 'online';
+                if ($due > 0.01) return 'due';
+                return $order->payment_method ?: 'cash';
+            })
+            ->map(function($orders, $key) {
+                $label = match($key) {
+                    'cash' => 'Cash Counter (Unassigned)',
+                    'online' => 'Online Payment (Direct / QR)',
+                    'split' => 'Split Payment (Cash + Online)',
+                    'due' => 'Customer Due / Credit',
+                    default => ucfirst($key) . ' (Unassigned)',
+                };
+                
+                return [
+                    'id' => 'method_' . $key,
+                    'name' => $label,
+                    'type' => $key,
+                    'filter_key' => in_array($key, ['cash', 'online', 'due']) ? $key : null,
+                    'order_count' => $orders->count(),
+                    'total_revenue' => (float) $orders->sum('grand_total'),
+                    'avg_order_value' => (float) $orders->avg('grand_total')
+                ];
+            });
+
+        $paymentSales = $accountSales->concat($unassignedSales)->sortByDesc('total_revenue')->values();
+
+        // ── Daily Counter Cash Transactions (Cash Out & Cash In) ───────────
+        $counterCashOut = 0;
+        $counterCashIn = 0;
+        $counterTransactions = collect();
+
+        if (class_exists(\App\Models\CashRegisterTransaction::class) && \Illuminate\Support\Facades\Schema::hasTable('cash_register_transactions')) {
+            $tenantId = auth()->user()?->tenant_id;
+            $counterQuery = \App\Models\CashRegisterTransaction::with(['user:id,name', 'category:id,name', 'session:id,opened_at,closed_at'])
+                ->whereBetween('created_at', [$startDate, $endDate]);
+
+            if ($tenantId) {
+                $counterQuery->where('tenant_id', $tenantId);
+            }
+
+            $allCounterTx = $counterQuery->orderBy('created_at', 'desc')->get();
+            $counterCashOut = (float) $allCounterTx->where('type', 'cash_out')->sum('amount');
+            $counterCashIn  = (float) $allCounterTx->where('type', 'cash_in')->sum('amount');
+            $counterTransactions = $allCounterTx->map(function($tx) {
+                return [
+                    'id' => $tx->id,
+                    'type' => $tx->type, // 'cash_out' or 'cash_in'
+                    'amount' => (float) $tx->amount,
+                    'notes' => $tx->notes,
+                    'category' => $tx->category ? $tx->category->name : ($tx->type === 'cash_out' ? 'General Expense' : 'Cash In'),
+                    'user' => $tx->user ? $tx->user->name : 'Staff',
+                    'session_id' => $tx->cash_register_session_id,
+                    'created_at' => $tx->created_at ? $tx->created_at->toIso8601String() : null,
+                ];
+            });
+        }
 
         // ── All tables & menus for filter dropdowns ────────────────────────────────
         $allTables = \App\Models\Table::orderBy('table_number')->get(['id', 'table_number']);
@@ -222,10 +295,14 @@ class ReportController extends Controller
                 'avg_order_value'  => (float) $avgOrderValue,
                 'avg_sitting_mins' => (float) round($avgSittingMins),
                 'busiest_hour'     => $busiestHour !== null ? (int) $busiestHour : null,
+                'counter_cash_out' => (float) $counterCashOut,
+                'counter_cash_in'  => (float) $counterCashIn,
+                'counter_net'      => (float) ($counterCashIn - $counterCashOut),
             ],
             'top_items'   => Inertia::defer(fn() => $topItems),
             'table_sales' => Inertia::defer(fn() => $tableSales),
             'payment_sales' => Inertia::defer(fn() => $paymentSales),
+            'counter_transactions' => Inertia::defer(fn() => $counterTransactions),
             'all_tables'  => $allTables,
             'all_menus'   => $allMenus,
         ]);

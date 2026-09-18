@@ -78,14 +78,26 @@ export default function EditOrder({ order, menus, table, customers, categories, 
 
     const activeCategories = categories || [];
     const [activeTab, setActiveTab] = useState('All');
+    const [itemSearch, setItemSearch] = useState('');
 
     const filteredMenu = useMemo(() => {
         if (!menus) return [];
-        if (activeTab === 'All') return menus;
-        const matchedCat = activeCategories.find(c => c.name === activeTab);
-        if (!matchedCat) return [];
-        return menus.filter(m => Number(m.category_id) === Number(matchedCat.id));
-    }, [menus, activeTab, activeCategories]);
+        let list = menus;
+        if (activeTab !== 'All') {
+            const matchedCat = activeCategories.find(c => c.name === activeTab);
+            if (matchedCat) {
+                list = list.filter(m => Number(m.category_id) === Number(matchedCat.id));
+            }
+        }
+        if (itemSearch.trim()) {
+            const query = itemSearch.toLowerCase().trim();
+            list = list.filter(m => 
+                m.name?.toLowerCase().includes(query) || 
+                m.description?.toLowerCase().includes(query)
+            );
+        }
+        return list;
+    }, [menus, activeTab, activeCategories, itemSearch]);
 
     const isOutOfStock = (menuItem) => {
         if (!menuItem.recipes || menuItem.recipes.length === 0) return false;
@@ -469,6 +481,43 @@ export default function EditOrder({ order, menus, table, customers, categories, 
                     
                     {/* Left: Menu Items Select */}
                     <div className="lg:col-span-8 flex flex-col bg-white/60 backdrop-blur-xl rounded-3xl border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.04)] overflow-hidden order-2 lg:order-1">
+                        {/* Search & Filter Header */}
+                        <div className="p-4 sm:p-5 border-b border-gray-100 bg-white/50 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    placeholder="Search food, beverages, items by name..."
+                                    value={itemSearch}
+                                    onChange={(e) => setItemSearch(e.target.value)}
+                                    className="w-full pl-10 pr-9 py-2.5 bg-white border border-gray-200 rounded-xl text-xs sm:text-sm font-semibold text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none shadow-sm transition-all"
+                                />
+                                {itemSearch && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setItemSearch('')}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-full hover:bg-gray-100 transition-colors"
+                                        title="Clear search"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                            </div>
+
+                            {itemSearch && activeTab !== 'All' && (
+                                <div className="flex items-center gap-2 text-xs font-bold text-gray-600 bg-red-50/60 border border-red-100 px-3 py-2 rounded-xl shrink-0">
+                                    <span>In category: <strong className="text-red-700">{activeTab}</strong></span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveTab('All')}
+                                        className="text-red-600 hover:text-red-800 underline font-black ml-1"
+                                    >
+                                        Show All
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
                         {/* Tabs */}
                         <div className="flex px-6 border-b border-gray-100 overflow-x-auto custom-scrollbar shrink-0 gap-2 bg-gray-50/40">
                             {[{id: 'all', name: 'All'}, ...activeCategories].map(cat => (
@@ -493,6 +542,30 @@ export default function EditOrder({ order, menus, table, customers, categories, 
                                     {[...Array(10)].map((_, i) => (
                                         <div key={i} className="animate-pulse bg-gray-100 rounded-2xl h-48 w-full"></div>
                                     ))}
+                                </div>
+                            ) : filteredMenu.length === 0 ? (
+                                <div className="py-16 flex flex-col items-center justify-center text-center px-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center mb-3">
+                                        <Search className="w-5 h-5" />
+                                    </div>
+                                    <h4 className="text-sm font-extrabold text-gray-900 mb-1">No items found</h4>
+                                    <p className="text-xs text-gray-500 max-w-xs mb-4">
+                                        {itemSearch 
+                                            ? `No menu items matching "${itemSearch}" in ${activeTab === 'All' ? 'any category' : activeTab}.` 
+                                            : 'No menu items found in this category.'}
+                                    </p>
+                                    {(itemSearch || activeTab !== 'All') && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setItemSearch('');
+                                                setActiveTab('All');
+                                            }}
+                                            className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold shadow hover:bg-red-700 transition-all active:scale-95"
+                                        >
+                                            Reset Search & Category
+                                        </button>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
